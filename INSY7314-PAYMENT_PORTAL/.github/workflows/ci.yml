@@ -1,49 +1,75 @@
-name: CI
+name: CI (Lint • Test • Audit • Build • Secrets)
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, dev, develop, "**/*" ]
   pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   backend:
-    name: Backend • Lint / Test / Audit / Build
+    name: Backend
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: 20
+          cache: npm
           cache-dependency-path: backend/package-lock.json
-
-      - run: npm ci
-      - run: npm run lint
-      - run: npm test
-      - run: npm run audit
-      - run: npm run build
+      - name: Install
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Test
+        env:
+          NODE_ENV: test
+          # Needed for ESM tests:
+          NODE_OPTIONS: --experimental-vm-modules
+        run: npm test --runInBand
+      - name: Security audit (npm)
+        run: npm audit --audit-level=moderate --omit=dev || true
+      - name: Build (if any)
+        run: npm run build --if-present
 
   frontend:
-    name: Frontend • Lint / Test / Audit / Build
+    name: Frontend
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: 20
+          cache: npm
           cache-dependency-path: frontend/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck (optional)
+        run: npm run typecheck --if-present
+      - name: Build
+        env:
+          VITE_API_BASE: https://localhost:4001
+          VITE_RECAPTCHA_SITE_KEY: dummy
+        run: npm run build
 
-      - run: npm ci
-      - run: npm run lint
-      - run: npm test
-      - run: npm run audit
-      - run: npm run build
+  secret-scan:
+    name: Gitleaks (repo history)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          args: --redact -v

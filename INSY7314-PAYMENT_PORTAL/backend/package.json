@@ -7,7 +7,7 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "lint": "eslint .",
-    "test": "node -e \"console.log('no tests yet')\"",
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --runInBand",
     "audit": "npm audit --audit-level=high || true",
     "format": "prettier --write .",
     "prepare": "husky install"
@@ -32,11 +32,14 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "cross-env": "^10.1.0",
     "eslint": "^9.9.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.30.0",
     "husky": "^9.1.7",
+    "jest": "^30.2.0",
     "nodemon": "^3.1.4",
-    "prettier": "^3.3.3"
+    "prettier": "^3.3.3",
+    "supertest": "^7.1.4"
   }
 }
