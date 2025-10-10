@@ -1,4 +1,4 @@
-name: CI (Lint • Test • Audit • Build • Secrets)
+name: DevSecOps CI (Backend • Frontend • Security)
 
 on:
   push:
@@ -35,19 +35,29 @@ jobs:
             npm install
           fi
 
-      # Lint runs, but won't fail the job (useful while rules are noisy)
+      # Lint runs, but won’t fail the build yet
       - name: Lint (non-blocking)
         run: npm run lint || true
         continue-on-error: true
 
-      # Tests are mandatory (will fail the job if they fail)
+      # Tests require env values → inject safe dummy ones
       - name: Test
         env:
           NODE_ENV: test
           NODE_OPTIONS: --experimental-vm-modules
+          MONGO_URI: mongodb://127.0.0.1:27017/testdb
+          CORS_ORIGIN: https://localhost:5173
+          PWD_PEPPER: dummy_pepper_for_ci
+          JWT_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef
+          DATA_KEY: a62b387f8738226611b593ce0d3aa9f134a60307c8b9bf6e5c4b4d3d7e0044b8
+          SMTP_HOST: smtp.example.com
+          SMTP_USER: ci@example.com
+          SMTP_PASS: dummy123
+          ACCESS_TOKEN_TTL_MIN: "15"
+          REFRESH_TOKEN_TTL_DAYS: "7"
         run: npm test --runInBand
 
-      - name: Security audit (npm, non-blocking)
+      - name: Security audit (non-blocking)
         run: npm audit --audit-level=moderate --omit=dev || true
 
       - name: Build (if any)
@@ -76,7 +86,6 @@ jobs:
             npm install
           fi
 
-      # Lint runs, but won't fail the job right now
       - name: Lint (non-blocking)
         run: npm run lint || true
         continue-on-error: true
@@ -84,14 +93,21 @@ jobs:
       - name: Typecheck (if present)
         run: npm run typecheck --if-present
 
-      - name: Build (if present)
+      # Build without SSL or TS crash in CI
+      - name: Build
         env:
           VITE_API_BASE: https://localhost:4001
           VITE_RECAPTCHA_SITE_KEY: dummy
-        run: npm run build --if-present
+          VITE_USE_HTTPS: "false"
+        run: |
+          if [ -f tsconfig.json ]; then
+            npm run build --if-present
+          else
+            npx vite build
+          fi
 
   secret-scan:
-    name: Gitleaks (repo history)
+    name: Secret Scan (Gitleaks)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
