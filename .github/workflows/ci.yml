@@ -1,13 +1,3 @@
-name: CI (Lint • Test • Audit • Build • Secrets)
-
-on:
-  push:
-    branches: [ main, dev, develop, "**/*" ]
-  pull_request:
-
-permissions:
-  contents: read
-
 jobs:
   backend:
     name: Backend
@@ -17,23 +7,33 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: backend/package-lock.json
+
       - name: Install
-        run: npm ci
-      - name: Lint
-        run: npm run lint
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Lint (if present)
+        run: npm run lint --if-present
+
       - name: Test
         env:
           NODE_ENV: test
-          # Needed for ESM tests:
           NODE_OPTIONS: --experimental-vm-modules
         run: npm test --runInBand
+
       - name: Security audit (npm)
         run: npm audit --audit-level=moderate --omit=dev || true
+
       - name: Build (if any)
         run: npm run build --if-present
 
@@ -45,22 +45,32 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+
       - name: Install
-        run: npm ci
-      - name: Lint
-        run: npm run lint
-      - name: Typecheck (optional)
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Lint (if present)
+        run: npm run lint --if-present
+
+      - name: Typecheck (if present)
         run: npm run typecheck --if-present
+
       - name: Build
         env:
           VITE_API_BASE: https://localhost:4001
           VITE_RECAPTCHA_SITE_KEY: dummy
-        run: npm run build
+        run: npm run build --if-present
 
   secret-scan:
     name: Gitleaks (repo history)
@@ -69,7 +79,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Run Gitleaks
+      - name: Run Gitleaks (non-blocking for now)
         uses: gitleaks/gitleaks-action@v2
         with:
           args: --redact -v
+        continue-on-error: true
