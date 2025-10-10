@@ -1,0 +1,19 @@
+# Root ignores
+.DS_Store
+node_modules
+dist
+.env
+.env.development.local
+.env.production.local
+.env.local
+*.log
+**/.turbo
+**/.parcel-cache
+**/.cache
+**/.vscode
+coverage
+
+frontend/ssl/
+backend/ssl/
+**/.env
+
