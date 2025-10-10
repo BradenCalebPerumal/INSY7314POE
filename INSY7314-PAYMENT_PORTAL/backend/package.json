@@ -10,7 +10,7 @@
     "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --runInBand",
     "audit": "npm audit --audit-level=high || true",
     "format": "prettier --write .",
-    "prepare": "husky install"
+    "prepare": "husky"
   },
   "dependencies": {
     "argon2": "^0.41.1",

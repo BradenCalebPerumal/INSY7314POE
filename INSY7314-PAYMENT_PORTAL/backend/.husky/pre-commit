@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🧹 Linting backend…"
+npm run lint || exit 1
+
+echo "🧪 Running tests…"
+NODE_OPTIONS=--experimental-vm-modules npm test || exit 1
