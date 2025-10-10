@@ -35,20 +35,21 @@ jobs:
             npm install
           fi
 
-      # Lint runs, but won’t fail the build yet
       - name: Lint (non-blocking)
         run: npm run lint || true
         continue-on-error: true
 
-      # Tests require env values → inject safe dummy ones
       - name: Test
         env:
           NODE_ENV: test
           NODE_OPTIONS: --experimental-vm-modules
+          # satisfy env schema (dummy but valid)
           MONGO_URI: mongodb://127.0.0.1:27017/testdb
           CORS_ORIGIN: https://localhost:5173
           PWD_PEPPER: dummy_pepper_for_ci
+          # >= 32 chars:
           JWT_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef
+          # 64 hex chars:
           DATA_KEY: a62b387f8738226611b593ce0d3aa9f134a60307c8b9bf6e5c4b4d3d7e0044b8
           SMTP_HOST: smtp.example.com
           SMTP_USER: ci@example.com
@@ -93,7 +94,6 @@ jobs:
       - name: Typecheck (if present)
         run: npm run typecheck --if-present
 
-      # Build without SSL or TS crash in CI
       - name: Build
         env:
           VITE_API_BASE: https://localhost:4001
