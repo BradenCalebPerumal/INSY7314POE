@@ -1,7 +1,7 @@
 import { findInvisibleChars } from "../utils/unicode.js";
 
-// Walks an object tree and checks all string values.
-// On the first violation, responds 400 with details.
+//Walks an object tree and checks all string values.
+//On the first violation, responds 400 with details.
 export function unicodeSanitizer() {
   return (req, res, next) => {
     try {

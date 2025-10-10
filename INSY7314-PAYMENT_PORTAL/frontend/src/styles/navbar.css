@@ -1,0 +1,70 @@
+.mh-nav{
+    position:sticky; top:0; z-index:50;
+    background:linear-gradient(180deg, rgba(11,18,32,.85), rgba(11,18,32,.4));
+    backdrop-filter: blur(10px);
+    border-bottom:1px solid var(--stroke);
+  }
+  .mh-nav-inner{
+    max-width:1160px; margin:0 auto; padding:.9rem 1rem;
+    display:flex; align-items:center; gap:1rem;
+  }
+  .mh-brand{display:flex; align-items:center; gap:.75rem;}
+  .mh-brand img{width:36px; height:36px; filter:drop-shadow(0 2px 6px rgba(58,160,255,.45))}
+  .mh-brand-text{display:flex; flex-direction:column; line-height:1.1}
+  .bank-name{font-weight:700; letter-spacing:.2px}
+  .bank-suite{font-size:.8rem; color:var(--muted)}
+  
+  .mh-links{
+    margin-left:2rem; display:flex; gap:1rem; align-items:center;
+  }
+  .mh-links a{
+    padding:.6rem .8rem; border-radius:999px; border:1px solid transparent;
+  }
+  .mh-links a:hover{ border-color:var(--stroke); background:rgba(255,255,255,.03) }
+  
+  .mh-actions{ margin-left:auto; display:flex; align-items:center; gap:.75rem; }
+  .mh-auth .btn.ghost:hover{background:rgba(255,255,255,.05)}
+  .mh-auth .btn.solid:hover{opacity:.92}
+  
+  .mh-user{position:relative; display:flex; align-items:center; gap:.6rem; cursor:pointer}
+  .avatar{
+    width:32px; height:32px; border-radius:50%;
+    background:linear-gradient(135deg,var(--brand),var(--brand-2));
+    display:grid; place-items:center; font-weight:700;
+  }
+  .u-name{font-size:.95rem}
+  
+  .dropdown{
+    position:absolute; right:0; top:120%;
+    background:var(--card); border:1px solid var(--stroke);
+    border-radius:12px; padding:.4rem; width:200px;
+    opacity:0; transform:translateY(-6px); pointer-events:none;
+    transition:.18s ease;
+  }
+  .dropdown.open{opacity:1; transform:translateY(0); pointer-events:auto}
+  .dropdown a, .dropdown .logout-btn{
+    display:block; width:100%; text-align:left;
+    background:transparent; color:var(--text);
+    padding:.6rem .7rem; border-radius:8px; border:0;
+  }
+  .dropdown a:hover, .dropdown .logout-btn:hover{
+    background:rgba(255,255,255,.06);
+  }
+  
+  .mh-burger{
+    display:none; margin-left:.5rem; width:40px; height:40px;
+    background:transparent; border:1px solid var(--stroke);
+    border-radius:10px;
+  }
+  .mh-burger span{display:block; height:2px; background:#fff; margin:6px 8px}
+  
+  @media (max-width: 980px){
+    .mh-links{
+      position:absolute; left:0; right:0; top:64px;
+      transform:translateY(-12px); opacity:0; pointer-events:none;
+      background:var(--bg-soft); border-bottom:1px solid var(--stroke);
+      padding: .75rem; display:grid; gap:.25rem;
+    }
+    .mh-burger{display:block}
+  }
+  

@@ -1,5 +1,4 @@
 // backend/src/app.js
-
 import express from "express";
 import morgan from "morgan";
 import compression from "compression";
@@ -8,7 +7,6 @@ import helmet from "helmet";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import { unicodeSanitizer } from "./middleware/unicodeSanitizer.js";
-
 import { env } from "./config/env.js";
 
 import { healthRouter } from "./routes/health.js";
@@ -16,27 +14,29 @@ import { authRouter } from "./routes/auth.js";
 import { meRouter } from "./routes/me.js";
 import { paymentsRouter } from "./routes/payments.js";
 
-/** Resolve CORS origin flexibly (dev + prod) */
-function makeCorsOrigin(allowed) {
-  if (!allowed) return false;
-  const allowedList = Array.isArray(allowed) ? allowed : [allowed];
-  return function corsOrigin(origin, cb) {
-    // Allow same-origin (non-browser) or no Origin (curl/postman)
-    if (!origin) return cb(null, true);
-    if (allowedList.includes(origin)) return cb(null, true);
-    return cb(new Error("CORS: origin not allowed"), false);
-  };
-}
+/** Build CORS middleware from allowed origins (array) */
+function buildCors(allowedOrigins) {
+  const devAllowRegex = /^https?:\/\/(localhost|127\.0\.0\.1):5173$/;
 
-/** Security middleware factory */
-function buildSecurityMiddlewares(allowedOrigin) {
-  const corsMw = cors({
-    origin: makeCorsOrigin(allowedOrigin),
+  return cors({
+    origin(origin, cb) {
+      if (!origin) return cb(null, true); // curl/postman or same-origin
+      if (allowedOrigins.includes(origin) || devAllowRegex.test(origin)) {
+        return cb(null, true);
+      }
+      console.warn("[CORS] blocked origin:", origin, "allowed:", allowedOrigins);
+      return cb(new Error("CORS: origin not allowed"));
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     maxAge: 86400, // cache preflight 24h
   });
+}
+
+/** Security middleware factory */
+function buildSecurityMiddlewares(allowedOrigins) {
+  const corsMw = buildCors(allowedOrigins);
 
   const helmetMw = helmet({
     contentSecurityPolicy: {
@@ -49,16 +49,8 @@ function buildSecurityMiddlewares(allowedOrigin) {
           "https://www.google.com",
           "https://www.gstatic.com",
         ],
-        "script-src": [
-          "'self'",
-          "https://www.google.com",
-          "https://www.gstatic.com",
-        ],
-        "frame-src": [
-          "'self'",
-          "https://www.google.com",
-          "https://www.gstatic.com",
-        ],
+        "script-src": ["'self'", "https://www.google.com", "https://www.gstatic.com"],
+        "frame-src": ["'self'", "https://www.google.com", "https://www.gstatic.com"],
         "img-src": ["'self'", "data:"],
         "style-src": ["'self'", "'unsafe-inline'"],
         "object-src": ["'none'"],
@@ -69,11 +61,10 @@ function buildSecurityMiddlewares(allowedOrigin) {
     },
     referrerPolicy: { policy: "no-referrer" },
     crossOriginEmbedderPolicy: false,
-    // ✅ HSTS in production (preload-ready)
-    hsts: env.NODE_ENV === "production"
-      ? { maxAge: 31536000, includeSubDomains: true, preload: true }
-      : false,
-    // Extra hardening headers not on by default:
+    hsts:
+      env.NODE_ENV === "production"
+        ? { maxAge: 31536000, includeSubDomains: true, preload: true }
+        : false,
     crossOriginResourcePolicy: { policy: "same-origin" },
     permissionsPolicy: {
       features: {
@@ -104,32 +95,42 @@ function buildSecurityMiddlewares(allowedOrigin) {
     max: 300,
     standardHeaders: true,
     legacyHeaders: false,
-    // (optional) don’t rate-limit health checks
     skip: (req) => req.path === "/health",
   });
 
-  return [compression(), hpp(), corsMw, helmetMw, limiter];
+  return { corsMw, helmetMw, limiter };
 }
 
 /** App factory */
 export function createApp() {
   const app = express();
 
+  // see what the browser is actually sending (helps diagnose)
+  app.use((req, _res, next) => {
+    if (req.method === "OPTIONS" || req.path.startsWith("/auth")) {
+      console.log("[REQ]", req.method, req.path, "Origin=", req.headers.origin, "Host=", req.headers.host);
+    }
+    next();
+  });
+
   // If behind a proxy in prod (Heroku/Render/NGINX/etc.)
   app.set("trust proxy", env.NODE_ENV === "production" ? 1 : false);
 
-  // Security & common middleware
-  app.use(...buildSecurityMiddlewares(
-    // allow multiple origins in env: "https://localhost:5173,https://your-prod-domain"
-    env.CORS_ORIGIN?.includes(",")
-      ? env.CORS_ORIGIN.split(",").map((s) => s.trim())
-      : env.CORS_ORIGIN
-  ));
+  // env.CORS_ORIGIN is already an array (from env.js)
+  const { corsMw, helmetMw, limiter } = buildSecurityMiddlewares(env.CORS_ORIGIN);
 
-  // parse body before sanitizer
+  // CORS FIRST, and explicitly handle preflight
+  app.options("*", corsMw);
+  app.use(corsMw);
+
+  // Common security/perf
+  app.use(compression());
+  app.use(hpp());
+  app.use(helmetMw);
+  app.use(limiter);
+
+  // Body parsing & sanitization
   app.use(express.json({ limit: "1mb" }));
-
-  // block invisible/control Unicode before hitting routes
   app.use(unicodeSanitizer());
 
   app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
@@ -141,9 +142,7 @@ export function createApp() {
   app.use("/payments", paymentsRouter);
 
   // 404
-  app.use((req, res) => {
-    res.status(404).json({ error: "Not found" });
-  });
+  app.use((req, res) => res.status(404).json({ error: "Not found" }));
 
   // Error handler (last)
   // eslint-disable-next-line no-unused-vars

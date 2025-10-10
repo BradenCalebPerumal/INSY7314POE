@@ -1,12 +1,12 @@
-import React, { useEffect, useRef } from "react";
+ import React, { useEffect, useRef } from "react";
 
-/**
- * Google reCAPTCHA v2 Checkbox wrapper
- *
- * Props:
- *   siteKey (string) - your reCAPTCHA site key
- *   onChange (fn)    - callback with token (string) or null (expired/error)
- */
+    /**
+     * Google reCAPTCHA v2 Checkbox wrapper
+     *
+     * Props:
+     *   siteKey (string) - your reCAPTCHA site key
+     *   onChange (fn)    - callback with token (string) or null (expired/error)
+     */
 export default function ReCaptchaBox({ siteKey, onChange }) {
   const ref = useRef(null);
   const widgetId = useRef(null);
@@ -40,3 +40,4 @@ export default function ReCaptchaBox({ siteKey, onChange }) {
     </div>
   );
 }
+

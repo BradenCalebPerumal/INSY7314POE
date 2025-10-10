@@ -2,7 +2,9 @@
 import "dotenv/config";
 import { z } from "zod";
 
-// Helper: decode hex/base64/base64url 32-byte key
+/* ---------- helpers ---------- */
+
+// decode hex/base64/base64url 32-byte key (unchanged)
 function decodeDataKeyToBytes(raw) {
   if (typeof raw !== "string" || !raw) throw new Error("DATA_KEY must be set");
   let s = raw.trim();
@@ -30,26 +32,61 @@ function decodeDataKeyToBytes(raw) {
   return buf;
 }
 
-// -------------------
-// Validation schema
-// -------------------
+// Parse CORS_ORIGIN into a normalized array of http(s) origins
+const CorsOriginArray = z
+  .string()
+  .min(1, "CORS_ORIGIN is required")
+  .transform((raw) => {
+    // strip wrapping quotes then split on commas
+    const s = raw.trim().replace(/^['"]|['"]$/g, "");
+    return s.split(",").map((x) => x.trim()).filter(Boolean);
+  })
+  .pipe(
+    z
+      .array(z.string())
+      .nonempty()
+      .transform((arr) => {
+        const out = [];
+        const bad = [];
+        for (const item of arr) {
+          try {
+            const u = new URL(item);
+            if (u.protocol !== "http:" && u.protocol !== "https:") {
+              throw new Error("protocol must be http or https");
+            }
+            // normalize: protocol + host (host includes port if present)
+            out.push(`${u.protocol}//${u.host}`);
+          } catch (e) {
+            bad.push(`${item} (${e.message})`);
+          }
+        }
+        if (bad.length) {
+          throw new Error(`Invalid CORS_ORIGIN entr${bad.length > 1 ? "ies" : "y"}: ${bad.join(", ")}`);
+        }
+        return out;
+      })
+  );
+
+/* ---------- schema ---------- */
+
 const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().default(4000),
-  MONGO_URI: z.string().refine(
-    (s) => s.startsWith("mongodb://") || s.startsWith("mongodb+srv://"),
-    { message: "MONGO_URI must start with mongodb:// or mongodb+srv://" }
-  ),
-  CORS_ORIGIN: z.string().url(),
+  MONGO_URI: z
+    .string()
+    .refine((s) => s.startsWith("mongodb://") || s.startsWith("mongodb+srv://"), {
+      message: "MONGO_URI must start with mongodb:// or mongodb+srv://",
+    }),
+  // 👉 accept comma-separated list, validate each, return array
+  CORS_ORIGIN: CorsOriginArray,
+
   PWD_PEPPER: z.string().min(16),
   JWT_SECRET: z.string().min(32),
   DATA_KEY: z.string().min(1),
 
-  // Token lifetimes
   ACCESS_TOKEN_TTL_MIN: z.coerce.number().default(15),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().default(7),
 
-  // SMTP for POP email
   SMTP_HOST: z.string().min(1),
   SMTP_PORT: z.coerce.number().default(587),
   SMTP_USER: z.string().min(1),
@@ -63,9 +100,18 @@ if (!parsed.success) {
   process.exit(1);
 }
 
-export const env = parsed.data;
+export const env = {
+  ...parsed.data,
+  //default SMTP_FROM to SMTP_USER if not provided
+  SMTP_FROM: parsed.data.SMTP_FROM ?? parsed.data.SMTP_USER,
+};
 
-// Single source of truth for the AES key (32 bytes)
+//Single source of truth for the AES key (32 bytes)
 export function getDataKeyBytes() {
   return decodeDataKeyToBytes(env.DATA_KEY);
+}
+
+//dev visibility
+if (env.NODE_ENV !== "production") {
+  console.log("[env] CORS_ORIGIN =", env.CORS_ORIGIN);
 }

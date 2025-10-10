@@ -1,4 +1,4 @@
-// backend/src/models/PasswordReset.js
+//backend/src/models/PasswordReset.js
 import mongoose from "mongoose";
 
 const schema = new mongoose.Schema({

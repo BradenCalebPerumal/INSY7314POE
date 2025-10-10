@@ -1,15 +1,15 @@
-// frontend/src/lib/api.js
-// Prefer env; default to your HTTPS dev API.
+//frontend/src/lib/api.js
+//Prefer env; default to your HTTPS dev API.
 const API_BASE =
   (import.meta.env.VITE_API_BASE && import.meta.env.VITE_API_BASE.replace(/\/+$/, "")) ||
   "https://localhost:4001";
 
-// Generic request helper with better errors + abort timeout
+//Generic request helper with better errors + abort timeout
 async function req(method, path, body, token) {
   const url = `${API_BASE}${path}`;
   const auth = token || (typeof localStorage !== "undefined" ? localStorage.getItem("token") : "");
 
-  // 15s safety timeout
+  //15s safety timeout
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), 15000);
 
@@ -22,18 +22,18 @@ async function req(method, path, body, token) {
         ...(auth ? { Authorization: `Bearer ${auth}` } : {}),
       },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-      credentials: "include", // harmless with JWT header; useful if you later add cookies
+      credentials: "include", //harmless with JWT header; useful if you later add cookies
       mode: "cors",
       signal: ac.signal,
     });
   } catch (e) {
     clearTimeout(t);
-    // Typical when backend is down, wrong port, or self-signed cert not trusted
+    //Typical when backend is down, wrong port, or self-signed cert not trusted
     throw new Error(e?.name === "AbortError" ? "Request timed out" : `Network error: ${e?.message || e}`);
   }
   clearTimeout(t);
 
-  // Try JSON first; fall back to text
+  //Try JSON first; fall back to text
   let data = null;
   const ct = res.headers.get("content-type") || "";
   if (ct.includes("application/json")) {
@@ -43,7 +43,7 @@ async function req(method, path, body, token) {
   }
 
   if (!res.ok) {
-    // Build a helpful message from structured payloads or raw text
+    //Build a helpful message from structured payloads or raw text
     if (data && typeof data === "object") {
       const parts = [];
       if (data.error) parts.push(data.error);

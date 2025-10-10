@@ -1,0 +1,310 @@
+/* page layout tweaks */
+.payauth-hero { min-height: calc(100vh - 120px); }
+.payauth-card { display:grid; place-items:center; gap:16px; padding: 1.2rem 1.2rem 1.4rem; }
+
+/* ring container */
+.ring-wrap{ position:relative; width:160px; height:160px; display:grid; place-items:center; }
+.ring{ position:absolute; inset:0; transform: rotate(-90deg); } /* start at 12 o'clock */
+.ring .track{
+  fill:none; stroke: rgba(255,255,255,.12); stroke-width: 10;
+  filter: drop-shadow(0 0 12px rgba(0,0,0,.35));
+}
+.ring .progress{
+  fill:none; stroke: url(#grad), linear-gradient(90deg, var(--brand), var(--brand-2));
+  stroke: rgba(123,92,255,.9);
+  stroke-width: 10; stroke-linecap: round;
+  transition: stroke-dasharray .4s ease;
+  filter: drop-shadow(0 0 10px rgba(123,92,255,.35));
+}
+
+/* flip counter */
+.flip{
+  position:relative; width:120px; height:86px; border-radius:14px;
+  display:grid; place-items:center; font-weight:800;
+  font-size: clamp(1.8rem, 3.2vw, 2.6rem);
+  color:#fff; letter-spacing:.5px;
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+  border:1px solid var(--stroke);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.04), 0 10px 24px rgba(0,0,0,.25);
+  overflow:hidden;
+  animation: popIn .5s ease both;
+}
+@keyframes popIn { from{ transform: translateY(8px) scale(.98); opacity:0 } to{ transform:none; opacity:1 } }
+
+.flip-top, .flip-bottom{
+  grid-area: 1/1;
+  display:grid; place-items:center;
+  width:100%; height:100%;
+  will-change: transform;
+}
+.flip-bottom::after{
+  /* when the number changes, animate a subtle flip */
+  content: attr(data-next);
+  position:absolute; inset:0; display:grid; place-items:center; opacity:0;
+  transform-origin: top;
+}
+.flip:not(.expired) .flip-bottom{
+  animation: tick 1s steps(1, end) infinite;
+}
+@keyframes tick {
+  49% { opacity:1; }
+  50% { opacity:1; }
+}
+.flip:not(.expired) .flip-bottom::after{
+  animation: flipDown 1s ease-in-out infinite;
+}
+@keyframes flipDown {
+  0%   { opacity:0; transform: rotateX(0deg); }
+  45%  { opacity:0; transform: rotateX(0deg); }
+  50%  { opacity:1; transform: rotateX(-88deg); }
+  100% { opacity:0; transform: rotateX(-180deg); }
+}
+.sec-label{
+  position:absolute; bottom:6px; width:100%; text-align:center;
+  font-size:.8rem; color:var(--muted); letter-spacing:.2px;
+}
+
+/* helper bullets */
+.hints{
+  display:grid; gap:6px; margin: 6px 0 2px; padding:0; list-style:none;
+  text-align:center;
+}
+.hint{ color:var(--muted); font-size:.96rem; }
+.hint .dot{
+  display:inline-block; width:6px; height:6px; border-radius:999px; margin-right:6px;
+  background: linear-gradient(90deg, var(--brand), var(--brand-2));
+  box-shadow: 0 0 8px rgba(58,160,255,.45);
+}
+
+/* CTA */
+.approve-btn{
+  margin-top:.2rem; width:100%;
+  box-shadow: 0 10px 24px rgba(58,160,255,.2), inset 0 0 0 1px rgba(255,255,255,.06);
+  transition: transform .15s ease-out, box-shadow .2s ease, background .2s ease;
+}
+.approve-btn:hover{
+  box-shadow: 0 16px 36px rgba(123,92,255,.28), inset 0 0 0 1px rgba(255,255,255,.08);
+}
+.approve-btn.disabled{
+  opacity:.6; cursor:not-allowed; filter:saturate(.8);
+}
+
+/* expired note */
+.expired-note{
+  margin: 6px 0 0; color:#ffbcbc; text-align:center; font-weight:600;
+  animation: pulseWarn 1.2s ease-in-out infinite;
+}
+@keyframes pulseWarn {
+  0%,100%{ opacity:.85; text-shadow: 0 0 0 rgba(255,107,107,0) }
+  50%{ opacity:1; text-shadow: 0 0 16px rgba(255,107,107,.35) }
+}
+
+/* dark-friendly select/option if present on this page anywhere */
+.field.select select { color-scheme: dark; }
+.field.select select, .field.select option {
+  background-color: rgba(15,20,35,.95);
+  color: var(--text);
+}
+.field.select option:hover, .field.select option:focus {
+  background-color: rgba(58,160,255,.25);
+  color:#fff;
+}
+/* ===== AUTH TIMER CLEANUP / POLISH ===== */
+
+/* 1) Softer card frame + better spacing */
+.payauth-card{
+    gap: 18px;
+    padding: 1.4rem 1.4rem 1.6rem;
+    border: 1px solid var(--stroke);
+    box-shadow:
+      0 10px 28px rgba(0,0,0,.25),
+      inset 0 0 0 1px rgba(255,255,255,.03);
+  }
+  
+  /* 2) Centered ring with number overlay (no translucent box behind) */
+  .ring-wrap{ width: 180px; height: 180px; }
+  .ring{ transform: rotate(-90deg); }
+  
+  .flip{
+    position: absolute;            /* overlay the ring center */
+    inset: 0;
+    display: grid; place-items: center;
+    width: 100%; height: 100%;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  
+  .flip-top, .flip-bottom{
+    position: absolute;
+    inset: 0;
+    display: grid; place-items: center;
+    font-weight: 900;
+    font-size: clamp(2rem, 4vw, 2.8rem);
+    text-shadow: 0 2px 10px rgba(0,0,0,.35);
+  }
+  
+  /* seconds label sits just under the digits */
+  .sec-label{
+    position: absolute;
+    bottom: 36px;                  /* above ring bottom */
+    width: 100%;
+    text-align: center;
+    font-size: .85rem;
+    color: var(--muted);
+  }
+  
+  /* 3) Ring colors + glow a bit stronger */
+  .ring .track{
+    stroke: rgba(255,255,255,.14);
+    stroke-width: 10;
+  }
+  .ring .progress{
+    stroke: rgba(123,92,255,.92);  /* brand-2 */
+    stroke-width: 10;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 12px rgba(123,92,255,.35));
+    transition: stroke-dasharray .35s ease;
+  }
+  
+  /* 4) Hints spacing + bullets aligned */
+  .hints{ gap: 8px; margin: 8px 0 6px; }
+  .hint{ color: var(--muted); line-height: 1.25; }
+  .hint .dot{
+    width: 7px; height: 7px; margin-right: 8px;
+    box-shadow: 0 0 10px rgba(58,160,255,.45);
+  }
+  
+  /* 5) CTA: more contrast, nicer hover, keep pill shape */
+  .approve-btn{
+    width: 100%;
+    margin-top: .4rem;
+    background: linear-gradient(
+      180deg,
+      rgba(92,140,255,.95),
+      rgba(120,96,255,.95)
+    ) !important;                   /* sits over base .btn color */
+    box-shadow:
+      0 14px 28px rgba(58,160,255,.22),
+      inset 0 0 0 1px rgba(255,255,255,.06);
+  }
+  .approve-btn:hover{
+    box-shadow:
+      0 20px 40px rgba(123,92,255,.30),
+      inset 0 0 0 1px rgba(255,255,255,.08);
+    transform: translateY(-1px);
+  }
+  .approve-btn.disabled{
+    filter: saturate(.8);
+    opacity: .65;
+    cursor: not-allowed;
+  }
+  
+  /* 6) Expired message a touch smaller + centered */
+  .expired-note{
+    margin-top: 6px;
+    font-size: .95rem;
+  }
+  
+  /* 7) Keep dropdowns dark if any appear here */
+  .field.select select,
+  .field.select option{
+    background-color: rgba(15,20,35,.96);
+    color: var(--text);
+  }
+/* keep the number dead-center inside the ring */
+.ring-wrap{ width: 180px; height: 180px; position: relative; }
+.ring{ position:absolute; inset:0; transform: rotate(-90deg); }
+
+/* number stays centered; no background box */
+.flip{
+  position:absolute; inset:0;
+  display:grid; place-items:center;
+  background: transparent !important;
+  border: none !important; box-shadow: none !important;
+}
+.flip-top, .flip-bottom{
+  position:absolute; inset:0;
+  display:grid; place-items:center;
+  font-weight: 900;
+  font-size: clamp(2.1rem, 4vw, 3rem);
+  line-height: 1;
+  text-shadow: 0 2px 10px rgba(0,0,0,.35);
+}
+
+/* move the "seconds" label OUTSIDE the ring, with comfy gap */
+.sec-label{
+  position:absolute;
+  top: calc(100% + 10px);   /* below the ring */
+  bottom: auto;
+  width:100%;
+  text-align:center;
+  font-size:.9rem;
+  color: var(--muted);
+  letter-spacing:.2px;
+}
+
+/* ring visuals (a touch more contrast + smooth cap) */
+.ring .track{ stroke: rgba(255,255,255,.14); stroke-width:10; }
+.ring .progress{
+  stroke: rgba(123,92,255,.95);
+  stroke-width:10; stroke-linecap:round;
+  filter: drop-shadow(0 0 12px rgba(123,92,255,.35));
+  transition: stroke-dasharray .35s ease;
+}
+
+/* slightly larger gap under ring to bullets */
+.hints{ margin-top: 26px; }
+/* parent container ensures both ring + number use the same center */
+.ring-wrap {
+    position: relative;
+    width: 180px;
+    height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  /* svg ring sits full size */
+  .ring {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    transform: rotate(-90deg);  /* start at top */
+  }
+  
+  /* number overlay, truly centered */
+  .flip {
+    position: relative;   /* no absolute stretching */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: clamp(2.4rem, 4vw, 3rem);
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 2px 10px rgba(0,0,0,.35);
+    pointer-events: none;
+  }
+  .flip-top, .flip-bottom {
+    display: none; /* if you’re not using flip animation yet, hide extras */
+  }
+  
+  /* seconds label directly beneath */
+  .sec-label {
+    margin-top: 6px;
+    font-size: .9rem;
+    color: var(--muted);
+    text-align: center;
+  }
+    /* subtle skeleton shimmer for loading rows */
+.skeleton{
+    height: 12px;
+    border-radius: 6px;
+    background:
+      linear-gradient(90deg, rgba(255,255,255,.06), rgba(255,255,255,.12), rgba(255,255,255,.06));
+    background-size: 200% 100%;
+    animation: sk 1.2s linear infinite;
+  }
+  @keyframes sk{ 0%{background-position:0 0} 100%{background-position:200% 0} }
+  
