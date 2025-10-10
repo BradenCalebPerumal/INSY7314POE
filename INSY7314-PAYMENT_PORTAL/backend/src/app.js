@@ -13,6 +13,7 @@ import { healthRouter } from "./routes/health.js";
 import { authRouter } from "./routes/auth.js";
 import { meRouter } from "./routes/me.js";
 import { paymentsRouter } from "./routes/payments.js";
+import cookieParser from "cookie-parser";
 
 /** Build CORS middleware from allowed origins (array) */
 function buildCors(allowedOrigins) {
@@ -122,7 +123,7 @@ export function createApp() {
   // CORS FIRST, and explicitly handle preflight
   app.options("*", corsMw);
   app.use(corsMw);
-
+  app.use(cookieParser());
   // Common security/perf
   app.use(compression());
   app.use(hpp());
