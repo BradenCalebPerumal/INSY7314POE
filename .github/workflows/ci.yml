@@ -35,16 +35,28 @@ jobs:
             npm install
           fi
 
-      # Lint runs, but won't fail the job (useful while rules are noisy)
+      # Lint runs but won’t fail the build yet (useful while rules are noisy)
       - name: Lint (non-blocking)
         run: npm run lint || true
         continue-on-error: true
 
-      # Tests are mandatory (will fail the job if they fail)
-      - name: Test
+      # Provide minimal env so your env.js validator doesn’t exit the process
+      - name: Test (with minimal test env)
         env:
           NODE_ENV: test
           NODE_OPTIONS: --experimental-vm-modules
+          # --- required by src/config/env.js; dummy but well-formed ---
+          MONGO_URI: mongodb://127.0.0.1:27017/testdb
+          CORS_ORIGIN: https://localhost:5173
+          PWD_PEPPER: test_pepper_only
+          JWT_SECRET: test_jwt_secret_only
+          DATA_KEY: 1111111111111111111111111111111111111111111111111111111111111111
+          SMTP_HOST: smtp.example.com
+          SMTP_USER: test@example.com
+          SMTP_PASS: test1234
+          # Optional ones you may parse:
+          ACCESS_TOKEN_TTL_MIN: '15'
+          REFRESH_TOKEN_TTL_DAYS: '7'
         run: npm test --runInBand
 
       - name: Security audit (npm, non-blocking)
@@ -76,7 +88,7 @@ jobs:
             npm install
           fi
 
-      # Lint runs, but won't fail the job right now
+      # Lint runs but won’t fail the build yet
       - name: Lint (non-blocking)
         run: npm run lint || true
         continue-on-error: true
@@ -84,11 +96,18 @@ jobs:
       - name: Typecheck (if present)
         run: npm run typecheck --if-present
 
-      - name: Build (if present)
+      # Your package.json "build" runs "tsc -b && vite build" but there's no tsconfig.json.
+      # If tsconfig.json is missing, fall back to building with Vite directly.
+      - name: Build (guarded)
         env:
           VITE_API_BASE: https://localhost:4001
           VITE_RECAPTCHA_SITE_KEY: dummy
-        run: npm run build --if-present
+        run: |
+          if [ -f tsconfig.json ]; then
+            npm run build --if-present
+          else
+            npx vite build
+          fi
 
   secret-scan:
     name: Gitleaks (repo history)
