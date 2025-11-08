@@ -7,6 +7,7 @@ executors:
       - image: mongo:7.0
     working_directory: ~/project
 
+  # Standard executor for Sonar Scan steps (used for setup_remote_docker)
   node_exec:
     docker:
       - image: cimg/node:20.11
@@ -95,15 +96,18 @@ jobs:
             COV_DIR_B="INSY7314-PAYMENT_PORTAL/backend/coverage"
             COV_DIR_F="INSY7314-PAYMENT_PORTAL/frontend/coverage"
             mkdir -p "$COV_DIR_B" "$COV_DIR_F"
-            [ -f "$COV_DIR_B/lcov.info" ] || echo "TN:" > "$COV_DIR_B/lcov.info"
-            [ -f "$COV_DIR_F/lcov.info" ] || echo "TN:" > "$COV_DIR_F/lcov.info"
+            # Create a minimal LCOV if tests didn't produce one
+            if [ ! -f "$COV_DIR_B/lcov.info" ]; then echo "TN:" > "$COV_DIR_B/lcov.info"; fi
+            if [ ! -f "$COV_DIR_F/lcov.info" ]; then echo "TN:" > "$COV_DIR_F/lcov.info"; fi
             ls -lah "$COV_DIR_B" "$COV_DIR_F" || true
 
       - persist_to_workspace:
           root: .
+          # CRITICAL: Persist the entire project folder for the scanner container to access all source files
           paths:
-            - INSY7314-PAYMENT_PORTAL
-
+            - INSY7314-PAYMENT_PORTAL 
+            
+  # 🏆 FINAL, STABLE JOB: Runs the scan using the official SonarSource image with remote Docker
   sonar_scan_official:
     executor: node_exec
     environment:
@@ -113,16 +117,11 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
-
+      
+      # 1. CRITICAL FIX: Set up a remote Docker environment
       - setup_remote_docker:
           docker_layer_caching: false
-
-      - run:
-          name: Debug workspace contents
-          command: |
-            ls -al
-            ls -al INSY7314-PAYMENT_PORTAL || true
-
+      
       - run:
           name: SonarCloud scan using official image (Path Fix)
           command: |
@@ -141,10 +140,12 @@ jobs:
               -Dsonar.test.inclusions="**/*.{test,spec}.{js,jsx,ts,tsx}" \
               -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info,frontend/coverage/lcov.info"
 
+
 workflows:
   build_pipeline:
     jobs:
       - build_test
+      # Use the stable, path-corrected job
       - sonar_scan_official:
           requires:
             - build_test
