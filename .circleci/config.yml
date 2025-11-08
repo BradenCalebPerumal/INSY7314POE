@@ -26,7 +26,7 @@ jobs:
       PWD_PEPPER: pepper_dev_secret_123456
       JWT_SECRET: jwt_dev_secret_abcdefghijklmnopqrstuvwxyz_1234567890
       DATA_KEY: a62b387f8738226611b593ce0d3aa9f134a60307c8b9bf6e5c4b4d3d7e0044b8
-      MONGO_URI: mongodb://127.0.0.0.1:27017/testdb
+      MONGO_URI: mongodb://127.0.0.1:27017/testdb
 
       SEND_EMAILS: "false"
       SMTP_HOST: localhost
@@ -111,19 +111,25 @@ jobs:
     executor: sonar_exec
     environment:
       SONAR_HOST_URL: https://sonarcloud.io
+      # Ensure path to npm global bin is available for non-sudo install
+      PATH: "$PATH:$(npm bin -g)"
       # SONAR_TOKEN must be set in CircleCI project env vars
     steps:
       - checkout
       - attach_workspace:
           at: .
 
-      # FIX: Install Sonar Scanner CLI without 'sudo' to avoid permission issues
+      # FIX: Install Sonar Scanner CLI globally but allow the user to write to a safe location.
       - run:
           name: Install Sonar Scanner CLI
-          command: npm install -g sonar-scanner
+          # Use --prefix to install globally in a user-writable location (~/.npm-global)
+          command: |
+            npm config set prefix '~/.npm-global'
+            npm install -g sonar-scanner
 
       - run:
           name: SonarCloud scan
+          # The PATH environment variable set in 'environment' should now allow 'sonar-scanner' to run
           command: |
             sonar-scanner -X \
               -Dsonar.host.url="${SONAR_HOST_URL}" \
