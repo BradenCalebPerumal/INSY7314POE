@@ -122,13 +122,8 @@ jobs:
       - setup_remote_docker:
           docker_layer_caching: false
       - run:
-          name: SonarCloud scan using official image (Path Fix)
+          name: SonarCloud scan using official image (Final Fix)
           command: |
-            # host-side checks (optional)
-            ls -al INSY7314-PAYMENT_PORTAL/backend || true
-            ls -al INSY7314-PAYMENT_PORTAL/frontend || true
-
-            # run scan
             docker run --rm \
               -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
               -e SONAR_TOKEN="${SONAR_TOKEN}" \
@@ -140,8 +135,8 @@ jobs:
               -Dsonar.projectName="INSY7314POE" \
               -Dsonar.sourceEncoding="UTF-8" \
               -Dsonar.projectBaseDir="/src" \
-              -Dsonar.sources="backend,frontend" \
-              -Dsonar.tests="backend/tests,frontend/tests" \
+              -Dsonar.sources="backend/src,frontend/src" \
+              -Dsonar.tests="backend/tests" \
               -Dsonar.test.inclusions="**/*.{test,spec}.{js,jsx,ts,tsx}" \
               -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" \
               -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info,frontend/coverage/lcov.info"
