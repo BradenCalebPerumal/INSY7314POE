@@ -1,58 +1,45 @@
 version: 2.1
 
 executors:
-  node_with_mongo:
+  node_executor:
     docker:
       - image: cimg/node:20.11
-      - image: mongo:7.0
     working_directory: ~/project
 
-  sonar_exec:
+  sonar_executor:
     docker:
       - image: sonarsource/sonar-scanner-cli:5.0.1
     working_directory: ~/project
 
 jobs:
   build_test:
-    executor: node_with_mongo
+    executor: node_executor
     environment:
       NODE_ENV: test
       NODE_OPTIONS: --experimental-vm-modules
       CI: "true"
-
-      # --- Backend env (dummy but valid) ---
+      # minimal env so env.ts/env.js validations pass in CI
       CORS_ORIGIN: https://localhost:5173
-      PWD_PEPPER: pepper_dev_secret_123456
-      JWT_SECRET: jwt_dev_secret_abcdefghijklmnopqrstuvwxyz_1234567890
+      PWD_PEPPER: dummy_pepper_for_ci_1234     # >=16 chars
+      JWT_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef  # >=32 chars
       DATA_KEY: a62b387f8738226611b593ce0d3aa9f134a60307c8b9bf6e5c4b4d3d7e0044b8
       MONGO_URI: mongodb://127.0.0.1:27017/testdb
-
       SEND_EMAILS: "false"
-      SMTP_HOST: localhost
-      SMTP_USER: ci@example.com
-      SMTP_PASS: dummy-password
-      EMAIL_FROM: ci@example.com
-
-      ACCESS_TOKEN_TTL_MIN: "15"
-      REFRESH_TOKEN_TTL_DAYS: "7"
+      SMTP_HOST: "localhost"
+      SMTP_USER: "ci"
+      SMTP_PASS: "ci"
     steps:
       - checkout
 
+      # (Optional) lightweight mongod so mongoose can connect in unit tests that touch DB
       - run:
-          name: Install netcat for port checks
+          name: Start local Mongo
           command: |
-            sudo apt-get update
-            sudo apt-get install -y netcat-openbsd
-
-      - run:
-          name: Wait for Mongo (max 120s)
-          command: |
+            docker run -d --name ci-mongo -p 27017:27017 mongo:7
             for i in $(seq 1 60); do
-              if nc -z 127.0.0.1 27017; then
-                echo "Mongo is up ✔"; break
-              fi
-              echo "Waiting for Mongo... ($i/60)"
-              sleep 2
+              if nc -z 127.0.0.1 27017; then echo "Mongo up"; break; fi
+              echo "Waiting for Mongo..."
+              sleep 1
             done
 
       - run:
@@ -60,12 +47,6 @@ jobs:
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             if [ -f package-lock.json ]; then npm ci; else npm install; fi
-
-      - run:
-          name: Lint backend (non-blocking)
-          command: |
-            cd INSY7314-PAYMENT_PORTAL/backend
-            npm run lint || true
 
       - run:
           name: Jest coverage (backend)
@@ -79,7 +60,6 @@ jobs:
             set -euxo pipefail
             COV_DIR="INSY7314-PAYMENT_PORTAL/backend/coverage"
             mkdir -p "$COV_DIR"
-            # Create a minimal LCOV if jest didn't produce one
             if [ ! -f "$COV_DIR/lcov.info" ]; then
               echo "TN:" > "$COV_DIR/lcov.info"
               echo "Created placeholder $COV_DIR/lcov.info"
@@ -92,17 +72,39 @@ jobs:
             - INSY7314-PAYMENT_PORTAL/backend/coverage
 
   sonar_scan:
-    executor: sonar_exec
+    executor: sonar_executor
     environment:
       SONAR_HOST_URL: https://sonarcloud.io
-      # SONAR_TOKEN must be set in CircleCI project env vars
+      # SONAR_TOKEN must be set in CircleCI Project Settings → Environment Variables
     steps:
       - checkout
       - attach_workspace:
           at: .
+
+      - run:
+          name: Show repo tree for debugging
+          command: |
+            ls -la
+            ls -la INSY7314-PAYMENT_PORTAL || true
+            ls -la INSY7314-PAYMENT_PORTAL/backend || true
+            ls -la INSY7314-PAYMENT_PORTAL/frontend || true
+
+      - run:
+          name: Build sonar sources list (backend/src + optional frontend/src)
+          command: |
+            set -e
+            BASE="INSY7314-PAYMENT_PORTAL"
+            SRC_LIST="backend/src"
+            if [ -d "$BASE/frontend/src" ]; then
+              SRC_LIST="$SRC_LIST,frontend/src"
+            fi
+            echo "SOURCES=$SRC_LIST" >> $BASH_ENV
+            echo "Computed SOURCES=$SRC_LIST"
+
       - run:
           name: SonarCloud scan
           command: |
+            source $BASH_ENV
             sonar-scanner \
               -Dsonar.host.url="${SONAR_HOST_URL}" \
               -Dsonar.login="${SONAR_TOKEN}" \
@@ -111,10 +113,10 @@ jobs:
               -Dsonar.projectName="INSY7314POE" \
               -Dsonar.sourceEncoding="UTF-8" \
               -Dsonar.projectBaseDir="INSY7314-PAYMENT_PORTAL" \
-              -Dsonar.sources="INSY7314-PAYMENT_PORTAL/backend/src,INSY7314-PAYMENT_PORTAL/frontend/src" \
+              -Dsonar.sources="${SOURCES}" \
               -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" \
               -Dsonar.test.inclusions="**/*.{test,spec}.{js,jsx,ts,tsx}" \
-              -Dsonar.javascript.lcov.reportPaths="INSY7314-PAYMENT_PORTAL/backend/coverage/lcov.info"
+              -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info"
 
 workflows:
   build_pipeline:
