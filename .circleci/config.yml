@@ -8,7 +8,7 @@ executors:
 
   sonar_executor:
     docker:
-      # use a valid tag; 6.2.1 doesn't exist
+      # use a valid tag; 6.2.1 does not exist
       - image: sonarsource/sonar-scanner-cli:5.0.1
     working_directory: ~/project
 
@@ -19,7 +19,8 @@ jobs:
       NODE_ENV: test
       NODE_OPTIONS: --experimental-vm-modules
       CI: "true"
-      # --- backend env (CI-safe dummy values) ---
+
+      # --- backend environment variables (dummy CI-safe values) ---
       CORS_ORIGIN: https://localhost:5173
       PWD_PEPPER: dummy_pepper_for_ci
       JWT_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef
@@ -77,27 +78,16 @@ jobs:
               npm run build --if-present || npx vite build
             fi
 
-      # hand the coverage folder to the sonar job
-      - persist_to_workspace:
-          root: .
-          paths:
-            - INSY7314-PAYMENT_PORTAL/backend/coverage
-
   sonar_scan:
     executor: sonar_executor
     environment:
       SONAR_HOST_URL: https://sonarcloud.io
-      # SONAR_TOKEN must be set in CircleCI project env vars (masked)
+      # SONAR_TOKEN must be set in CircleCI Project Settings (or Context)
     steps:
       - checkout
-      - attach_workspace:
-          at: .
-
       - run:
           name: SonarCloud scan
           command: |
-            # If the frontend has no tests/coverage, that's fine. We only point to backend lcov.
-            # Do NOT set sonar.tests; it caused "Invalid value of sonar.tests".
             sonar-scanner \
               -Dsonar.host.url="${SONAR_HOST_URL}" \
               -Dsonar.login="${SONAR_TOKEN}" \
@@ -107,8 +97,8 @@ jobs:
               -Dsonar.sourceEncoding="UTF-8" \
               -Dsonar.projectBaseDir="INSY7314-PAYMENT_PORTAL" \
               -Dsonar.sources="INSY7314-PAYMENT_PORTAL/backend/src,INSY7314-PAYMENT_PORTAL/frontend/src" \
+              -Dsonar.tests="INSY7314-PAYMENT_PORTAL/backend/tests,INSY7314-PAYMENT_PORTAL/frontend/tests" \
               -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" \
-              -Dsonar.test.inclusions="**/*.test.js,**/*.spec.js,**/*.test.ts,**/*.spec.ts,**/*.test.jsx,**/*.spec.jsx,**/*.test.tsx,**/*.spec.tsx" \
               -Dsonar.javascript.lcov.reportPaths="INSY7314-PAYMENT_PORTAL/backend/coverage/lcov.info"
 
 workflows:
