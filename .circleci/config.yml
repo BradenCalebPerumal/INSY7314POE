@@ -9,8 +9,8 @@ executors:
   # 👇 Scanner comes preinstalled here — no curl, no unzip, no Java setup
   sonar_executor:
     docker:
-      - image: sonarsource/sonar-scanner-cli:6.2.1
-    working_directory: ~/project
+  - image: sonarsource/sonar-scanner-cli:5.0.1
+  working_directory: ~/project
 
 jobs:
   build_test:
@@ -100,3 +100,4 @@ workflows:
       - sonar_scan:
           requires:
             - build_test
+
