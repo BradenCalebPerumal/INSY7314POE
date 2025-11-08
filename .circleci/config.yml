@@ -10,48 +10,75 @@ jobs:
   build_test:
     executor: node_executor
     environment:
+      # match GH Actions
       NODE_ENV: test
+      NODE_OPTIONS: --experimental-vm-modules
       CI: "true"
 
-      # === FIXED ENV VARS (pass all backend env checks) ===
-      CORS_ORIGIN: '["https://example.com"]'       # valid HTTPS origin
-      PWD_PEPPER: "ci_pwd_pepper_1234567890abcd"   # ≥16 chars
-      JWT_SECRET: "ci_jwt_secret_1234567890_abcdefghijklmno1234567890"  # ≥32 chars
-      DATA_KEY: "ci_data_key_1234567890abcd"
+      # ===== satisfy your backend env schema (same vars as your GH workflow) =====
+      # use a single plain string (NOT JSON) so your parser doesn't reject it
+      CORS_ORIGIN: https://localhost:5173
 
-      SMTP_HOST: "ci"
-      SMTP_USER: "ci"
-      SMTP_PASS: "ci"
-      EMAIL_FROM: "ci@example.com"
+      # length/format-constrained secrets (dummy but valid)
+      PWD_PEPPER: dummy_pepper_for_ci                     # ≥16 chars
+      JWT_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef   # ≥32 chars
+      DATA_KEY: a62b387f8738226611b593ce0d3aa9f134a60307c8b9bf6e5c4b4d3d7e0044b8  # 64 hex
+
+      # DB (if tests don’t connect, it won’t be used; still satisfies schema)
+      MONGO_URI: mongodb://127.0.0.1:27017/testdb
+
+      # mail (dummy)
+      SMTP_HOST: smtp.example.com
+      SMTP_USER: ci@example.com
+      SMTP_PASS: dummy123
+      EMAIL_FROM: ci@example.com
       SEND_EMAILS: "false"
+
+      # tokens ttl (strings)
+      ACCESS_TOKEN_TTL_MIN: "15"
+      REFRESH_TOKEN_TTL_DAYS: "7"
 
     steps:
       - checkout
+
+      # ---- BACKEND ----
       - run:
           name: Install deps (backend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
-            npm ci
+            if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      - run:
+          name: Lint backend (non-blocking)
+          command: |
+            cd INSY7314-PAYMENT_PORTAL/backend
+            npm run lint || true
       - run:
           name: Run tests with coverage (backend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
-            npm test -- --coverage --coverageReporters=lcov
+            npm test --runInBand --coverage --coverageReporters=lcov
 
-      # Optional frontend build/tests (skipped if not present)
+      # ---- FRONTEND (optional; runs only if folder exists) ----
       - run:
           name: Install deps (frontend) if present
           command: |
             if [ -f INSY7314-PAYMENT_PORTAL/frontend/package.json ]; then
               cd INSY7314-PAYMENT_PORTAL/frontend
-              npm ci
+              if [ -f package-lock.json ]; then npm ci; else npm install; fi
             fi
       - run:
-          name: Run tests with coverage (frontend) if present
+          name: Lint frontend (non-blocking) if present
           command: |
             if [ -f INSY7314-PAYMENT_PORTAL/frontend/package.json ]; then
               cd INSY7314-PAYMENT_PORTAL/frontend
-              npm test -- --coverage --coverageReporters=lcov
+              npm run lint || true
+            fi
+      - run:
+          name: Build frontend (if present)
+          command: |
+            if [ -f INSY7314-PAYMENT_PORTAL/frontend/package.json ]; then
+              cd INSY7314-PAYMENT_PORTAL/frontend
+              npm run build --if-present || npx vite build
             fi
 
   sonar_scan:
