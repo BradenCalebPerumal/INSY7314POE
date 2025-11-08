@@ -1,0 +1,163 @@
+/* staff.payment.css — fancy themed version for StaffPayment */
+
+:root {
+    --mz-primary:#15433a;
+    --mz-accent:#D9A15B;
+    --mz-bg:#0b1522;
+    --mz-card:rgba(255,255,255,0.05);
+    --mz-text:#e8eef6;
+    --mz-muted:#90a0b6;
+    --stroke:rgba(255,255,255,0.12);
+    --radius:16px;
+    --shadow:0 12px 32px rgba(0,0,0,0.25);
+  }
+  
+  .mz-wrap {
+    position: relative;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: clamp(18px, 3vw, 32px);
+    color: var(--mz-text);
+  }
+  
+  .mz-card {
+    background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    border: 1px solid var(--stroke);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 18px 22px;
+    margin-bottom: 1.2rem;
+    backdrop-filter: blur(8px);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+  }
+  
+  .mz-card:hover { transform: translateY(-3px); border-color: rgba(255,255,255,0.25); }
+  
+  h3, h4 {
+    margin: 0 0 10px 0;
+    letter-spacing: .2px;
+  }
+  
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  
+  .grid2 > div {
+    padding: 10px 12px;
+    border: 1px solid var(--stroke);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.03);
+  }
+  
+  .grid2 b {
+    display: block;
+    color: var(--mz-muted);
+    margin-bottom: 4px;
+  }
+  
+  .mt { margin-top: 14px; }
+  
+  /* Buttons */
+  .actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+  }
+  
+  .btn {
+    border: 1px solid var(--stroke);
+    background: linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,255,255,0.04));
+    color: var(--mz-text);
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s ease;
+  }
+  
+  .btn:hover { transform: translateY(-1px); border-color: var(--mz-accent); }
+  .btn-primary {
+    background: linear-gradient(180deg, var(--mz-accent), #b88245);
+    color: #101820;
+    font-weight: 700;
+  }
+  .btn.ghost { background: transparent; }
+  
+  /* Chips for status */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    padding: 0.25rem 0.7rem;
+    border: 1px solid var(--stroke);
+    background: rgba(255,255,255,0.1);
+  }
+  
+  .chip-created { color:#94a3b8; }
+  .chip-pending_auth { color:#fbbf24; }
+  .chip-sent { color:#60a5fa; }
+  .chip-verified { color:#c084fc; }
+  .chip-completed { color:#34d399; }
+  
+  /* Textarea */
+  textarea {
+    width: 100%;
+    border-radius: 12px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--stroke);
+    color: var(--mz-text);
+    padding: 10px 12px;
+    resize: vertical;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  textarea:focus {
+    border-color: var(--mz-accent);
+    box-shadow: 0 0 0 3px rgba(217,161,91,0.25);
+  }
+  
+  /* Audit Trail */
+  .audit {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+  }
+  .audit li {
+    display: grid;
+    grid-template-columns: 180px 1fr 1fr;
+    padding: 8px 12px;
+    border: 1px solid var(--stroke);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.03);
+    color: var(--mz-text);
+    font-size: 0.9rem;
+  }
+  
+  .audit li span:first-child { color: var(--mz-muted); font-variant-numeric: tabular-nums; }
+  
+  .mz-err {
+    color: #ff6b6b;
+    font-weight: 600;
+    margin-top: 10px;
+  }
+  
+  /* Animations */
+  .fadeIn {
+    animation: fadeIn 0.4s ease both;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  @media (max-width: 760px) {
+    .grid2 { grid-template-columns: 1fr; }
+    .audit li { grid-template-columns: 1fr; }
+  }
+  

@@ -209,6 +209,8 @@ router.delete("/beneficiaries/:id", requireAuth, async (req, res) => {
 // GET /payments/:id/auth  -> remaining seconds + token
 router.get("/:id/auth", requireAuth, async (req, res) => {
   try {
+    console.log("[staff:getOne]", id, typeof id);
+
     const p = await Payment.findOne({ _id: req.params.id, owner: req.auth.sub });
     if (!p) return res.status(404).json({ error: "not found" });
 

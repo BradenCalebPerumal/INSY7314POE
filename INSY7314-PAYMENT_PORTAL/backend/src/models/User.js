@@ -13,7 +13,9 @@ const UserSchema = new Schema(
 
     username: { type: String, required: true, unique: true, index: true },
     passwordHash: { type: String, required: true },
-
+     role: { type: String, enum: ['customer', 'staff', 'admin'], default: 'customer', index: true },
+    approvalPinHash: { type: String, default: null },    // 4–8 digits, hashed+salted just like password
+      isDisabled: { type: Boolean, default: false },
     // helpful extras
     passwordUpdatedAt: { type: Date, default: Date.now },   // used to invalidate older JWTs
     sessionVersion: { type: Number, default: 0 },           // bump to kill all sessions
@@ -29,6 +31,6 @@ const UserSchema = new Schema(
 );
 
 // helpful indexes
-UserSchema.index({ username: 1 }, { unique: true });
+//UserSchema.index({ username: 1 }, { unique: true });
 
 export const User = mongoose.model("User", UserSchema);

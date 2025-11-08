@@ -1,4 +1,3 @@
-// backend/src/app.js
 import express from "express";
 import morgan from "morgan";
 import compression from "compression";
@@ -6,6 +5,8 @@ import hpp from "hpp";
 import helmet from "helmet";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
+import cookieParser from "cookie-parser";
+
 import { unicodeSanitizer } from "./middleware/unicodeSanitizer.js";
 import { env } from "./config/env.js";
 
@@ -13,7 +14,10 @@ import { healthRouter } from "./routes/health.js";
 import { authRouter } from "./routes/auth.js";
 import { meRouter } from "./routes/me.js";
 import { paymentsRouter } from "./routes/payments.js";
-import cookieParser from "cookie-parser";
+
+import staffRoutes from "./routes/staff.routes.js";
+import adminRoutes from "./routes/admin.routes.js";
+import authJwt from "./middleware/authJwt.js";
 
 /** Build CORS middleware from allowed origins (array) */
 function buildCors(allowedOrigins) {
@@ -30,7 +34,9 @@ function buildCors(allowedOrigins) {
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+   // allowedHeaders: ["Content-Type", "Authorization"],
+      allowedHeaders: ["Content-Type", "Authorization", "Cache-Control", "Pragma"],
+
     maxAge: 86400, // cache preflight 24h
   });
 }
@@ -106,24 +112,32 @@ function buildSecurityMiddlewares(allowedOrigins) {
 export function createApp() {
   const app = express();
 
-  // see what the browser is actually sending (helps diagnose)
+  // quick request log to see preflights & auth
   app.use((req, _res, next) => {
-    if (req.method === "OPTIONS" || req.path.startsWith("/auth")) {
-      console.log("[REQ]", req.method, req.path, "Origin=", req.headers.origin, "Host=", req.headers.host);
+    if (req.method === "OPTIONS" || req.path.startsWith("/api/auth")) {
+      console.log(
+        "[REQ]",
+        req.method,
+        req.path,
+        "Origin=",
+        req.headers.origin,
+        "Host=",
+        req.headers.host
+      );
     }
     next();
   });
 
-  // If behind a proxy in prod (Heroku/Render/NGINX/etc.)
   app.set("trust proxy", env.NODE_ENV === "production" ? 1 : false);
 
-  // env.CORS_ORIGIN is already an array (from env.js)
   const { corsMw, helmetMw, limiter } = buildSecurityMiddlewares(env.CORS_ORIGIN);
 
-  // CORS FIRST, and explicitly handle preflight
-  app.options("*", corsMw);
+  // CORS FIRST + explicit universal preflight
   app.use(corsMw);
+  app.options("*", corsMw, (_req, res) => res.sendStatus(204));
+
   app.use(cookieParser());
+
   // Common security/perf
   app.use(compression());
   app.use(hpp());
@@ -136,11 +150,19 @@ export function createApp() {
 
   app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
 
-  // Routes
+  // Public routes
   app.use("/health", healthRouter);
-  app.use("/auth", authRouter);
+
+  // 🔁 ALIGN WITH FRONTEND: /api/auth/*
+  app.use("/api/auth", authRouter);
+  app.use("/api/auth/me", meRouter);
+  // (if these are public, keep as-is; if you intended /api/*, update similarly)
   app.use("/me", meRouter);
   app.use("/payments", paymentsRouter);
+
+  // Protected staff/admin APIs
+  app.use("/api/staff", authJwt, staffRoutes);
+  app.use("/api/admin", authJwt, adminRoutes);
 
   // 404
   app.use((req, res) => res.status(404).json({ error: "Not found" }));

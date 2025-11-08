@@ -1,21 +1,21 @@
+// src/pages/staff/StaffLogin.jsx
 import React, { useEffect, useRef, useState } from "react";
-import { postJSON } from "../lib/api";
-import { useNavigate } from "react-router-dom";
-import { reUsername, reAccountNumber } from "../lib/validators";
-import { useAuth } from "../AuthContext";
-import Layout from "../components/Layout";
-import ReCaptchaBox from "../components/ReCaptchaBox";
-import "../pages/auth.css";
+import { useAuth } from "../../AuthContext.jsx";
+import { loginStaff } from "../../lib/api.js";
+import { reUsername } from "../../lib/validators"; // staff: username only
+import Layout from "../../components/Layout";
+import ReCaptchaBox from "../../components/ReCaptchaBox";
+import "../auth.css"; // reuse the same CSS used by customer login
 
-export default function Login() {
-  const navigate = useNavigate();
-  const { setToken, setUsername, setFullName } = useAuth();
+export default function StaffLogin() {
+  const { setToken, setRole, setUsername, setFullName } = useAuth();
 
-  const [form, setForm] = useState({ username: "", accountNumber: "", password: "" });
+  // form state
+  const [form, setForm] = useState({ username: "", password: "" });
   const [errors, setErrors] = useState([]);
   const [busy, setBusy] = useState(false);
   const [captchaToken, setCaptchaToken] = useState(null);
-  const [showPw, setShowPw] = useState(false); // ✅ toggle state
+  const [showPw, setShowPw] = useState(false);
 
   function onChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -23,35 +23,50 @@ export default function Login() {
 
   async function onSubmit(e) {
     e.preventDefault();
+
+    // front-end validations (staff)
     const localErrors = [];
     if (!reUsername.test(form.username)) localErrors.push("Username invalid");
-    if (!reAccountNumber.test(form.accountNumber)) localErrors.push("Account number invalid");
     if (!form.password) localErrors.push("Password required");
     if (!captchaToken) localErrors.push("Please complete the CAPTCHA");
     if (localErrors.length) return setErrors(localErrors);
 
     try {
-      setBusy(true); setErrors([]);
-      const res = await postJSON("/api/auth/login", { ...form, captchaToken });
-            setToken(res.token);
-      setUsername(res.username);
-      if (res.fullName && setFullName) setFullName(res.fullName);
-      navigate("/welcome");
+      setBusy(true);
+      setErrors([]);
+      const res = await loginStaff({
+        username: form.username.trim(),
+        password: form.password,
+        captchaToken, // field name aligned with middleware
+      });
+
+      const token = res?.token;
+      if (!token) throw new Error("No token returned");
+
+      setToken(token);
+      if (res?.role) setRole(res.role);               // "staff" | "admin"
+      if (res?.username) setUsername(res.username);
+      if (res?.fullName) setFullName(res.fullName);
+
+      // go to staff home; your route guard will allow it now
+      window.location.assign("/staff");
     } catch (err) {
-      setErrors([err.message]);
+      setErrors([err?.message || "Invalid credentials"]);
     } finally {
       setBusy(false);
     }
   }
 
-  // --- tilt/magnet visuals (auth.css helpers) ---
+  // --- tilt/magnet visuals (shared with customer page via auth.css helpers) ---
   const [isReady, setIsReady] = useState(false);
   const cardRef = useRef(null);
   const ctaRef = useRef(null);
+
   useEffect(() => {
     const t = setTimeout(() => setIsReady(true), 30);
     return () => clearTimeout(t);
   }, []);
+
   function handleCardMove(e) {
     const el = cardRef.current;
     if (!el) return;
@@ -95,14 +110,16 @@ export default function Login() {
         </div>
 
         <div className="auth-wrap">
-          <h1 className="fade-up s1 shimmer-text">Sign in to MacroHard Bank Inc</h1>
-          <p className="subtitle fade-up s2">Secure access to International Payments.</p>
+          <h1 className="fade-up s1 shimmer-text">Employee Sign In</h1>
+          <p className="subtitle fade-up s2">MacroHard Bank Inc • Staff Portal</p>
 
           {errors.length > 0 && (
             <div className="f-error fade-up s2">
               <strong style={{ display: "block", marginBottom: 6 }}>Fix the following:</strong>
               <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
-                {errors.map((e, i) => <li key={i}>{e}</li>)}
+                {errors.map((e, i) => (
+                  <li key={i}>{e}</li>
+                ))}
               </ul>
             </div>
           )}
@@ -118,28 +135,19 @@ export default function Login() {
             <div className="f-row">
               <label htmlFor="username">Username</label>
               <div className="field">
-                <input id="username" name="username" value={form.username} onChange={onChange} required />
-                <span className="focus-underline" />
-              </div>
-            </div>
-
-            {/* Account number */}
-            <div className="f-row">
-              <label htmlFor="accountNumber">Account number</label>
-              <div className="field">
                 <input
-                  id="accountNumber"
-                  name="accountNumber"
-                  value={form.accountNumber}
+                  id="username"
+                  name="username"
+                  value={form.username}
                   onChange={onChange}
-                  inputMode="numeric"
                   required
+                  autoComplete="username"
                 />
                 <span className="focus-underline" />
               </div>
             </div>
 
-            {/* Password with toggle */}
+            {/* Password with toggle (same UI as customer) */}
             <div className="f-row pw-row">
               <label htmlFor="password">Password</label>
               <div className="field pw-wrap">
@@ -153,23 +161,34 @@ export default function Login() {
                   autoComplete="current-password"
                 />
                 <span className="focus-underline" />
-            <button
+                <button
                   type="button"
                   className={`pw-toggle ${showPw ? "on" : ""}`}
                   aria-label={showPw ? "Hide password" : "Show password"}
                   aria-pressed={showPw}
-                  onClick={() => setShowPw(s => !s)}
+                  onClick={() => setShowPw((s) => !s)}
                 >
                   <span className="icon">
                     {showPw ? (
                       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <path d="M3 3l18 18" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                        <path d="M9.9 5.1A10.9 10.9 0 0112 5c5.5 0 9.8 3.9 10.9 7-.3.9-1 2.2-2.2 3.5M6.1 6.1C3.5 7.6 1.8 9.8 1.1 12c.7 2.2 2.4 4.4 5 5.9A12 12 0 0012 19c1.1 0 2.1-.1 3.1-.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M3 3l18 18" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                        <path
+                          d="M9.9 5.1A10.9 10.9 0 0112 5c5.5 0 9.8 3.9 10.9 7-.3.9-1 2.2-2.2 3.5M6.1 6.1C3.5 7.6 1.8 9.8 1.1 12c.7 2.2 2.4 4.4 5 5.9A12 12 0 0012 19c1.1 0 2.1-.1 3.1-.4"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
                       </svg>
                     ) : (
                       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <path d="M1.05 12C2.22 8.94 6.48 5 12 5s9.78 3.94 10.94 7c-1.16 3.06-5.42 7-10.94 7S2.22 15.06 1.05 12z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
-                        <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="1.6"/>
+                        <path
+                          d="M1.05 12C2.22 8.94 6.48 5 12 5s9.78 3.94 10.94 7c-1.16 3.06-5.42 7-10.94 7S2.22 15.06 1.05 12z"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinejoin="round"
+                        />
+                        <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="1.6" />
                       </svg>
                     )}
                   </span>
@@ -177,7 +196,7 @@ export default function Login() {
               </div>
             </div>
 
-            {/* reCAPTCHA */}
+            {/* reCAPTCHA (same UX as customer) */}
             <ReCaptchaBox
               siteKey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
               onChange={setCaptchaToken}

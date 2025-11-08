@@ -32,7 +32,7 @@ const APP_URL = process.env.APP_URL || "http://localhost:5173";
 // cookie options (HTTPS-only in real life; allow http in dev if needed)
 const isProd = process.env.NODE_ENV === "production";
 const REFRESH_COOKIE_NAME = "refresh";
-const REFRESH_PATH = "/auth/refresh";
+const REFRESH_PATH = "/api/auth/refresh";
 
 const router = Router();
 
@@ -350,5 +350,40 @@ router.post("/logout", (_req, res) => {
   clearRefreshCookie(res);
   return res.json({ ok: true });
 });
+// in backend/src/routes/auth.js
+//router.post("/staff/login", async (req, res) => {
+router.post("/staff/login", requireRecaptcha, async (req, res) => {
+
+  try {
+    const { username, password } = req.body || {};
+    if (!reUsername.test(username || "")) return res.status(400).json({ error: "invalid username" });
+
+    const user = await User.findOne({ username });
+    if (!user) return res.status(401).json({ error: "invalid credentials" });
+    if (!["staff","admin"].includes(user.role)) return res.status(403).json({ error: "not staff" });
+
+    const okPw = await verifyPassword(password || "", user.passwordHash);
+    if (!okPw) {
+      await User.updateOne({ _id: user._id }, { $inc: { failedLogins: 1 } });
+      return res.status(401).json({ error: "invalid credentials" });
+    }
+
+    await User.updateOne({ _id: user._id }, { $set: { failedLogins: 0, lastLoginAt: new Date() } });
+    const access = issueAccessToken(user);
+    const refresh = issueRefreshToken(user);
+    setRefreshCookie(res, refresh);
+    return res.json({ ok: true, token: access, username: user.username, fullName: user.fullName, role: user.role });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: "server error" });
+  }
+});
+// in backend/src/routes/auth.js
+router.get("/me", requireAuth, async (req, res) => {
+  const user = await User.findById(req.auth.sub).select("username fullName role").lean();
+  if (!user) return res.status(401).json({ error: "unauthorized" });
+  res.json({ ok: true, user });
+});
+
 
 export const authRouter = router;
