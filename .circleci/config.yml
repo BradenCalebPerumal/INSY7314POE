@@ -9,6 +9,7 @@ executors:
 
   sonar_exec:
     docker:
+      # This image lacks Node.js, which is why we must install it in the job steps
       - image: sonarsource/sonar-scanner-cli:5.0.1
     working_directory: ~/project
 
@@ -55,6 +56,7 @@ jobs:
               sleep 2
             done
 
+      # --- Backend Build & Test ---
       - run:
           name: Install deps (backend)
           command: |
@@ -72,24 +74,39 @@ jobs:
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             npm test --runInBand --coverage --coverageReporters=lcov
+            
+      # --- Frontend Build & Test (New/Integrated) ---
+      - run:
+          name: Install deps (frontend)
+          command: |
+            cd INSY7314-PAYMENT_PORTAL/frontend
+            if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
+      - run:
+          name: Jest coverage (frontend)
+          command: |
+            cd INSY7314-PAYMENT_PORTAL/frontend
+            # Assuming Jest/coverage is configured for the frontend
+            npm test --runInBand --coverage --coverageReporters=lcov
+
+      # --- Coverage Setup (Updated for both) ---
       - run:
           name: Ensure coverage exists for Sonar
           command: |
             set -euxo pipefail
-            COV_DIR="INSY7314-PAYMENT_PORTAL/backend/coverage"
-            mkdir -p "$COV_DIR"
-            # Create a minimal LCOV if jest didn't produce one
-            if [ ! -f "$COV_DIR/lcov.info" ]; then
-              echo "TN:" > "$COV_DIR/lcov.info"
-              echo "Created placeholder $COV_DIR/lcov.info"
-            fi
-            ls -lah "$COV_DIR" || true
+            COV_DIR_B="INSY7314-PAYMENT_PORTAL/backend/coverage"
+            COV_DIR_F="INSY7314-PAYMENT_PORTAL/frontend/coverage"
+            mkdir -p "$COV_DIR_B" "$COV_DIR_F"
+            # Create a minimal LCOV if tests didn't produce one
+            if [ ! -f "$COV_DIR_B/lcov.info" ]; then echo "TN:" > "$COV_DIR_B/lcov.info"; fi
+            if [ ! -f "$COV_DIR_F/lcov.info" ]; then echo "TN:" > "$COV_DIR_F/lcov.info"; fi
+            ls -lah "$COV_DIR_B" "$COV_DIR_F" || true
 
       - persist_to_workspace:
           root: .
           paths:
             - INSY7314-PAYMENT_PORTAL/backend/coverage
+            - INSY7314-PAYMENT_PORTAL/frontend/coverage
 
   sonar_scan:
     executor: sonar_exec
@@ -100,9 +117,20 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
+          
+      # 🚀 FIX: Install Node.js for JS/TS analysis
+      - run:
+          name: Install Node.js for Sonar Scanner
+          command: |
+            # Use NodeSource for latest LTS version
+            sudo apt-get update -y
+            sudo apt-get install -y curl
+            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+            sudo apt-get install -y nodejs
+            node -v # Verify installation (should show v20.x)
+
       - run:
           name: SonarCloud scan
-          # Fix: Paths are now relative to the sonar.projectBaseDir
           command: |
             sonar-scanner -X \
               -Dsonar.host.url="${SONAR_HOST_URL}" \
@@ -115,7 +143,8 @@ jobs:
               -Dsonar.sources="backend/src,frontend/src" \
               -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" \
               -Dsonar.test.inclusions="**/*.{test,spec}.{js,jsx,ts,tsx}" \
-              -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info"
+              # FIXED: Combined LCOV reports for both apps, path is relative
+              -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info,frontend/coverage/lcov.info"
 
 workflows:
   build_pipeline:
