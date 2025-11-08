@@ -3,15 +3,12 @@ version: 2.1
 executors:
   node_with_mongo:
     docker:
-      # Primary container where steps run
       - image: cimg/node:20.11
-      # MongoDB service container for tests
       - image: mongo:7.0
     working_directory: ~/project
 
   sonar_exec:
     docker:
-      # Prebuilt SonarScanner + Java (no downloads)
       - image: sonarsource/sonar-scanner-cli:5.0.1
     working_directory: ~/project
 
@@ -22,13 +19,24 @@ jobs:
       NODE_ENV: test
       NODE_OPTIONS: --experimental-vm-modules
       CI: "true"
-      # ---- backend env (valid dummy values) ----
+
+      # --- Backend env (dummy but valid) ---
       CORS_ORIGIN: https://localhost:5173
-      PWD_PEPPER: pepper_dev_secret_123456
-      JWT_SECRET: jwt_dev_secret_abcdefghijklmnopqrstuvwxyz_1234567890
+      PWD_PEPPER: pepper_dev_secret_123456     # >=16 chars
+      JWT_SECRET: jwt_dev_secret_abcdefghijklmnopqrstuvwxyz_1234567890  # >=32
       DATA_KEY: a62b387f8738226611b593ce0d3aa9f134a60307c8b9bf6e5c4b4d3d7e0044b8
       MONGO_URI: mongodb://127.0.0.1:27017/testdb
+
+      # email settings (required by schema but disabled for tests)
       SEND_EMAILS: "false"
+      SMTP_HOST: localhost
+      SMTP_USER: ci@example.com
+      SMTP_PASS: dummy-password
+      EMAIL_FROM: ci@example.com
+
+      # token TTLs (if schema requires them)
+      ACCESS_TOKEN_TTL_MIN: "15"
+      REFRESH_TOKEN_TTL_DAYS: "7"
     steps:
       - checkout
 
