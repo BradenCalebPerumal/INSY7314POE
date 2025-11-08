@@ -7,10 +7,12 @@ executors:
     working_directory: ~/project
 
   # 👇 Scanner comes preinstalled here — no curl, no unzip, no Java setup
+ executors:
   sonar_executor:
     docker:
-  - image: sonarsource/sonar-scanner-cli:5.0.1
-  working_directory: ~/project
+      # was: sonarsource/sonar-scanner-cli:6.2.1  ← manifest unknown
+      - image: sonarsource/sonar-scanner-cli:5.0.1
+    working_directory: ~/project
 
 jobs:
   build_test:
