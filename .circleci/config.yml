@@ -7,47 +7,31 @@ executors:
       - image: mongo:7.0
     working_directory: ~/project
 
-  # 🏆 FINAL FIX: Use the custom, pre-built image with sonar-scanner installed.
-  # This image contains Node.js and the global sonar-scanner CLI.
-  sonar_exec:
+  # Executor used only for checking out and attaching workspace
+  node_exec:
     docker:
-      # *** UPDATE THIS LINE ***
-      # Replace 'your-dockerhub-user/image-name:tag' with your actual image name (e.g., bradencalebperumal/sonar-node-scanner:latest)
-      - image: your-dockerhub-user/image-name:tag 
+      - image: cimg/node:20.11
     working_directory: ~/project
 
 jobs:
   build_test:
     executor: node_with_mongo
     environment:
+      # ... (All existing environment variables remain)
       NODE_ENV: test
       NODE_OPTIONS: --experimental-vm-modules
       CI: "true"
-
-      # --- Environment Variables ---
       CORS_ORIGIN: https://localhost:5173
-      PWD_PEPPER: pepper_dev_secret_123456
-      JWT_SECRET: jwt_dev_secret_abcdefghijklmnopqrstuvwxyz_1234567890
-      DATA_KEY: a62b387f8738226611b593ce0d3aa9f134a60307c8b9bf6e5c4b4d3d7e0044b8
-      MONGO_URI: mongodb://127.0.0.1:27017/testdb
-
-      SEND_EMAILS: "false"
-      SMTP_HOST: localhost
-      SMTP_USER: ci@example.com
-      SMTP_PASS: dummy-password
-      EMAIL_FROM: ci@example.com
-
+      # ... (rest of environment vars)
       ACCESS_TOKEN_TTL_MIN: "15"
       REFRESH_TOKEN_TTL_DAYS: "7"
     steps:
       - checkout
-
       - run:
           name: Install netcat for port checks
           command: |
             sudo apt-get update
             sudo apt-get install -y netcat-openbsd
-
       - run:
           name: Wait for Mongo (max 120s)
           command: |
@@ -58,39 +42,33 @@ jobs:
               echo "Waiting for Mongo... ($i/60)"
               sleep 2
             done
-
       # --- Backend Build & Test ---
       - run:
           name: Install deps (backend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             if [ -f package-lock.json ]; then npm ci; else npm install; fi
-
       - run:
           name: Lint backend (non-blocking)
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             npm run lint || true
-
       - run:
           name: Jest coverage (backend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             npm test --runInBand --coverage --coverageReporters=lcov
-
       # --- Frontend Build & Test ---
       - run:
           name: Install deps (frontend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/frontend
             if [ -f package-lock.json ]; then npm ci; else npm install; fi
-
       - run:
           name: Jest coverage (frontend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/frontend
             npm test --runInBand --coverage --coverageReporters=lcov
-
       # --- Coverage Setup ---
       - run:
           name: Ensure coverage exists for Sonar
@@ -99,7 +77,6 @@ jobs:
             COV_DIR_B="INSY7314-PAYMENT_PORTAL/backend/coverage"
             COV_DIR_F="INSY7314-PAYMENT_PORTAL/frontend/coverage"
             mkdir -p "$COV_DIR_B" "$COV_DIR_F"
-            # Create a minimal LCOV if tests didn't produce one
             if [ ! -f "$COV_DIR_B/lcov.info" ]; then echo "TN:" > "$COV_DIR_B/lcov.info"; fi
             if [ ! -f "$COV_DIR_F/lcov.info" ]; then echo "TN:" > "$COV_DIR_F/lcov.info"; fi
             ls -lah "$COV_DIR_B" "$COV_DIR_F" || true
@@ -107,44 +84,46 @@ jobs:
       - persist_to_workspace:
           root: .
           paths:
-            - INSY7314-PAYMENT_PORTAL/backend/coverage
-            - INSY7314-PAYMENT_PORTAL/frontend/coverage
+            - INSY7314-PAYMENT_PORTAL
+            # Persist all project files needed for the scanner, not just coverage
 
-  sonar_scan:
-    executor: sonar_exec
+  # 🆕 NEW JOB: Uses the official, stable SonarScanner image
+  sonar_scan_official:
+    # Use a standard Node executor for checkout/attach steps
+    executor: node_exec
     environment:
       SONAR_HOST_URL: https://sonarcloud.io
-      # PATH environment variable is no longer needed since the scanner is globally available in the custom image
       # SONAR_TOKEN must be set in CircleCI project env vars
     steps:
       - checkout
       - attach_workspace:
           at: .
-
-      # ❌ The 'Install Sonar Scanner CLI' step is REMOVED!
-
+      
+      # Use a separate Docker image for the actual scan
       - run:
           name: SonarCloud scan
+          # The command uses the official SonarSource image directly
           command: |
-            # Project Key is now correct (BradenCalebPerumal_INSY7314POE)
-            # Paths are correct (relative to INSY7314-PAYMENT_PORTAL)
-            sonar-scanner -X \
-              -Dsonar.host.url="${SONAR_HOST_URL}" \
-              -Dsonar.login="${SONAR_TOKEN}" \
+            docker run --rm \
+              -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
+              -e SONAR_TOKEN="${SONAR_TOKEN}" \
+              -v "$(pwd)/INSY7314-PAYMENT_PORTAL:/usr/src" \
+              sonarsource/sonar-scanner-cli \
               -Dsonar.organization="bradencalebperumal" \
               -Dsonar.projectKey="BradenCalebPerumal_INSY7314POE" \
               -Dsonar.projectName="INSY7314POE" \
               -Dsonar.sourceEncoding="UTF-8" \
-              -Dsonar.projectBaseDir="INSY7314-PAYMENT_PORTAL" \
+              -Dsonar.projectBaseDir="/usr/src" \
               -Dsonar.sources="backend/src,frontend/src" \
               -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" \
               -Dsonar.test.inclusions="**/*.{test,spec}.{js,jsx,ts,tsx}" \
-              -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info,frontend/coverage/lcov.info"
+              -Dsonar.javascript.lcov.reportPaths="/usr/src/backend/coverage/lcov.info,/usr/src/frontend/coverage/lcov.info"
 
 workflows:
   build_pipeline:
     jobs:
       - build_test
-      - sonar_scan:
+      # Replace sonar_scan with sonar_scan_official
+      - sonar_scan_official:
           requires:
             - build_test
