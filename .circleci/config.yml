@@ -14,26 +14,34 @@ jobs:
     executor: node_executor
     steps:
       - checkout
+
       - run:
           name: Install deps (backend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             npm ci
+
       - run:
           name: Run tests with coverage (backend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             npm test -- --coverage --coverageReporters=lcov
+
       - run:
-          name: Install deps (frontend) - optional
+          name: Install deps (frontend) if present
           command: |
-            cd INSY7314-PAYMENT_PORTAL/frontend || exit 0
-            [ -f package.json ] && npm ci || true
+            if [ -f INSY7314-PAYMENT_PORTAL/frontend/package.json ]; then
+              cd INSY7314-PAYMENT_PORTAL/frontend
+              npm ci
+            fi
+
       - run:
-          name: Run tests with coverage (frontend) - optional
+          name: Run tests with coverage (frontend) if present
           command: |
-            cd INSY7314-PAYMENT_PORTAL/frontend || exit 0
-            [ -f package.json ] && npm test -- --coverage --coverageReporters=lcov || true
+            if [ -f INSY7314-PAYMENT_PORTAL/frontend/package.json ]; then
+              cd INSY7314-PAYMENT_PORTAL/frontend
+              npm test -- --coverage --coverageReporters=lcov
+            fi
 
 workflows:
   build_pipeline:
