@@ -1,9 +1,26 @@
 version: 2.1
 
 executors:
-  node_executor:
+  node_with_mongo:
     docker:
+      # Primary container where your steps run
       - image: cimg/node:20.11
+        environment:
+          NODE_ENV: test
+          NODE_OPTIONS: --experimental-vm-modules
+          CI: "true"
+          # minimal env for your env validation in CI
+          CORS_ORIGIN: https://localhost:5173
+          PWD_PEPPER: dummy_pepper_for_ci_1234
+          JWT_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef
+          DATA_KEY: a62b387f8738226611b593ce0d3aa9f134a60307c8b9bf6e5c4b4d3d7e0044b8
+          MONGO_URI: mongodb://localhost:27017/testdb   # <-- service container is reachable via localhost
+          SEND_EMAILS: "false"
+          SMTP_HOST: "localhost"
+          SMTP_USER: "ci"
+          SMTP_PASS: "ci"
+      # MongoDB service container (no auth)
+      - image: mongo:7
     working_directory: ~/project
 
   sonar_executor:
@@ -13,31 +30,15 @@ executors:
 
 jobs:
   build_test:
-    executor: node_executor
-    environment:
-      NODE_ENV: test
-      NODE_OPTIONS: --experimental-vm-modules
-      CI: "true"
-      # minimal env so env.ts/env.js validations pass in CI
-      CORS_ORIGIN: https://localhost:5173
-      PWD_PEPPER: dummy_pepper_for_ci_1234     # >=16 chars
-      JWT_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef  # >=32 chars
-      DATA_KEY: a62b387f8738226611b593ce0d3aa9f134a60307c8b9bf6e5c4b4d3d7e0044b8
-      MONGO_URI: mongodb://127.0.0.1:27017/testdb
-      SEND_EMAILS: "false"
-      SMTP_HOST: "localhost"
-      SMTP_USER: "ci"
-      SMTP_PASS: "ci"
+    executor: node_with_mongo
     steps:
       - checkout
 
-      # (Optional) lightweight mongod so mongoose can connect in unit tests that touch DB
       - run:
-          name: Start local Mongo
+          name: Wait for Mongo to be ready
           command: |
-            docker run -d --name ci-mongo -p 27017:27017 mongo:7
             for i in $(seq 1 60); do
-              if nc -z 127.0.0.1 27017; then echo "Mongo up"; break; fi
+              (echo > /dev/tcp/localhost/27017) >/dev/null 2>&1 && echo "Mongo up" && break
               echo "Waiting for Mongo..."
               sleep 1
             done
