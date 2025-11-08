@@ -1,40 +1,44 @@
 version: 2.1
 
 executors:
-  node_executor:
+  node_with_mongo:
     docker:
-      - image: cimg/node:20.11
+      - image: cimg/node:20.11            # primary container
+      - image: mongo:7.0                  # service container for tests
     working_directory: ~/project
 
-  sonar_executor:
+  sonar_exec:
     docker:
-      # Use a valid tag
-      - image: sonarsource/sonar-scanner-cli:5.0.1
+      - image: sonarsource/sonar-scanner-cli:5.0.1   # prebuilt scanner + Java
     working_directory: ~/project
 
 jobs:
   build_test:
-    executor: node_executor
+    executor: node_with_mongo
     environment:
       NODE_ENV: test
       NODE_OPTIONS: --experimental-vm-modules
       CI: "true"
 
-      # --- backend environment variables (dummy CI-safe values) ---
+      # ---- backend env (dummy but valid) ----
       CORS_ORIGIN: https://localhost:5173
-      PWD_PEPPER: dummy_pepper_for_ci
-      JWT_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef
+      PWD_PEPPER: pepper_dev_secret_123456
+      JWT_SECRET: jwt_dev_secret_abcdefghijklmnopqrstuvwxyz_1234567890
       DATA_KEY: a62b387f8738226611b593ce0d3aa9f134a60307c8b9bf6e5c4b4d3d7e0044b8
-      MONGO_URI: mongodb://127.0.0.1:27017/testdb
-      SMTP_HOST: smtp.example.com
-      SMTP_USER: ci@example.com
-      SMTP_PASS: dummy123
-      EMAIL_FROM: ci@example.com
+      MONGO_URI: mongodb://127.0.0.1:27017/testdb   # connects to the mongo service
       SEND_EMAILS: "false"
-      ACCESS_TOKEN_TTL_MIN: "15"
-      REFRESH_TOKEN_TTL_DAYS: "7"
     steps:
       - checkout
+
+      - run:
+          name: Wait for Mongo to be ready
+          command: |
+            for i in {1..60}; do
+              if echo 'db.runCommand({ ping: 1 })' | mongo --quiet 127.0.0.1/testdb > /dev/null 2>&1; then
+                echo "Mongo is up"; break
+              fi
+              echo "Waiting for Mongo..."; sleep 2
+            done
 
       - run:
           name: Install deps (backend)
@@ -49,46 +53,41 @@ jobs:
             npm run lint || true
 
       - run:
-          name: Run tests with coverage (backend)
+          name: Jest coverage (backend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             npm test --runInBand --coverage --coverageReporters=lcov
 
-      - run:
-          name: Install deps (frontend) if present
-          command: |
-            if [ -f INSY7314-PAYMENT_PORTAL/frontend/package.json ]; then
-              cd INSY7314-PAYMENT_PORTAL/frontend
-              if [ -f package-lock.json ]; then npm ci; else npm install; fi
-            fi
-
-      - run:
-          name: Lint frontend (non-blocking) if present
-          command: |
-            if [ -f INSY7314-PAYMENT_PORTAL/frontend/package.json ]; then
-              cd INSY7314-PAYMENT_PORTAL/frontend
-              npm run lint || true
-            fi
-
-      - run:
-          name: Build frontend (if present)
-          command: |
-            if [ -f INSY7314-PAYMENT_PORTAL/frontend/package.json ]; then
-              cd INSY7314-PAYMENT_PORTAL/frontend
-              npm run build --if-present || npx vite build
-            fi
+      - persist_to_workspace:
+          root: .
+          paths:
+            - INSY7314-PAYMENT_PORTAL/backend/coverage
 
   sonar_scan:
-    executor: sonar_executor
+    executor: sonar_exec
     environment:
       SONAR_HOST_URL: https://sonarcloud.io
-      # SONAR_TOKEN must be set in CircleCI Project Settings (or Context)
+      # SONAR_TOKEN must be set in CircleCI project env vars
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - run:
           name: SonarCloud scan
           command: |
-            sonar-scanner -Dsonar.host.url="${SONAR_HOST_URL}" -Dsonar.login="${SONAR_TOKEN}" -Dsonar.organization="bradencalebperumal" -Dsonar.projectKey="bradencalebperumal_INSY7314POE" -Dsonar.projectName="INSY7314POE" -Dsonar.sourceEncoding="UTF-8" -Dsonar.projectBaseDir="INSY7314-PAYMENT_PORTAL" -Dsonar.sources="backend/src" -Dsonar.tests="backend/tests" -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info" -Dsonar.branch.name="main"
+            # CLI properties override sonar-project.properties if present.
+            sonar-scanner \
+              -Dsonar.host.url="${SONAR_HOST_URL}" \
+              -Dsonar.login="${SONAR_TOKEN}" \
+              -Dsonar.organization="bradencalebperumal" \
+              -Dsonar.projectKey="bradencalebperumal_INSY7314POE" \
+              -Dsonar.projectName="INSY7314POE" \
+              -Dsonar.sourceEncoding="UTF-8" \
+              -Dsonar.projectBaseDir="INSY7314-PAYMENT_PORTAL" \
+              -Dsonar.sources="INSY7314-PAYMENT_PORTAL/backend/src,INSY7314-PAYMENT_PORTAL/frontend/src" \
+              -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" \
+              -Dsonar.test.inclusions="**/*.{test,spec}.{js,jsx,ts,tsx}" \
+              -Dsonar.javascript.lcov.reportPaths="INSY7314-PAYMENT_PORTAL/backend/coverage/lcov.info"
 
 workflows:
   build_pipeline:
