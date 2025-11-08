@@ -7,48 +7,40 @@ executors:
       - image: mongo:7.0
     working_directory: ~/project
 
-  # 🆕 Executor for Sonar Scan steps (uses standard Node for file operations)
-  node_exec:
+  # 🏆 NEW EXECUTOR: Uses a CircleCI image with Docker CLI pre-installed.
+  docker_exec:
+    # This image includes the Docker CLI, making 'docker run' possible without installation.
     docker:
-      - image: cimg/node:20.11
+      - image: cimg/base:2023.10
     working_directory: ~/project
 
-# --- sonar_exec executor is removed as we are not using a custom image ---
+# --- The custom 'sonar_exec' executor is removed ---
 
 jobs:
   build_test:
     executor: node_with_mongo
     environment:
-      # ... (All existing environment variables remain)
+      # ... (All existing environment variables remain unchanged)
       NODE_ENV: test
       NODE_OPTIONS: --experimental-vm-modules
       CI: "true"
-      # ... (CORS, PWD_PEPPER, JWT, etc. remain unchanged)
+      CORS_ORIGIN: https://localhost:5173
+      # ... (rest of environment vars)
       ACCESS_TOKEN_TTL_MIN: "15"
       REFRESH_TOKEN_TTL_DAYS: "7"
     steps:
       - checkout
-      # ... (Netcat install, Wait for Mongo, Backend/Frontend installs/tests remain unchanged)
-      - run:
-          name: Ensure coverage exists for Sonar
-          command: |
-            set -euxo pipefail
-            COV_DIR_B="INSY7314-PAYMENT_PORTAL/backend/coverage"
-            COV_DIR_F="INSY7314-PAYMENT_PORTAL/frontend/coverage"
-            mkdir -p "$COV_DIR_B" "$COV_DIR_F"
-            if [ ! -f "$COV_DIR_B/lcov.info" ]; then echo "TN:" > "$COV_DIR_B/lcov.info"; fi
-            if [ ! -f "$COV_DIR_F/lcov.info" ]; then echo "TN:" > "$COV_DIR_F/lcov.info"; fi
-            ls -lah "$COV_DIR_B" "$COV_DIR_F" || true
-
+      # ... (All installation, wait, and test steps remain unchanged)
       - persist_to_workspace:
           root: .
-          # Must persist the entire project folder (INSY7314-PAYMENT_PORTAL) for the scanner container to access all source files
+          # Must persist the entire project folder (INSY7314-PAYMENT_PORTAL) for the scanner container to access source files
           paths:
             - INSY7314-PAYMENT_PORTAL 
             
-  # 🆕 NEW JOB: Uses the official, stable SonarScanner image via Docker-in-Docker (DinD) style command
+  # 🏆 NEW JOB: Uses the official, stable SonarScanner image via Docker-in-Docker (DinD) style command
   sonar_scan_official:
-    executor: node_exec
+    # Use the new executor with Docker CLI installed
+    executor: docker_exec
     environment:
       SONAR_HOST_URL: https://sonarcloud.io
       # SONAR_TOKEN must be set in CircleCI project env vars
@@ -57,17 +49,11 @@ jobs:
       - attach_workspace:
           at: .
       
-      # 1. Install Docker CLI (since it's not always in cimg/node by default)
-      # This enables the 'docker run' command below.
-      - run:
-          name: Install Docker CLI
-          command: |
-            sudo apt-get update && sudo apt-get install -y docker.io
-
+      # The 'docker run' command executes the Sonar scan using the official image
       - run:
           name: SonarCloud scan using official image
-          # We use 'docker run' to launch the official scanner image, mounting the source code
           command: |
+            # The 'docker' command is available here. It pulls the SonarSource image and runs it.
             docker run --rm \
               -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
               -e SONAR_TOKEN="${SONAR_TOKEN}" \
