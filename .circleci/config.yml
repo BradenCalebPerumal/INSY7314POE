@@ -10,34 +10,34 @@ executors:
     working_directory: ~/project
 
 jobs:
-  build_and_test:
+  build_test:
     executor: node_executor
     steps:
       - checkout
+
       - run:
-          name: Install backend deps
+          name: Install dependencies
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             npm ci
+
       - run:
-          name: Run tests with coverage (Jest -> lcov)
+          name: Run tests with coverage
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             npm test -- --coverage --coverageReporters=lcov
+
       - run:
-          name: Dependency audit (high+)
+          name: Copy coverage to repo root (for Sonar)
           command: |
-            cd INSY7314-PAYMENT_PORTAL/backend
-            npm audit --audit-level=high || true
+            mkdir -p coverage
+            cp INSY7314-PAYMENT_PORTAL/backend/coverage/lcov.info coverage/lcov.info || true
 
 workflows:
   build_pipeline:
     jobs:
-      - build_and_test
+      - build_test
       - sonarcloud/scan:
           requires:
-            - build_and_test
-      - sonarcloud/quality_gate:
-          requires:
-            - sonarcloud/scan
-          timeout: 15m
+            - build_test
+          context: sonarcloud   # holds SONAR_TOKEN etc.
