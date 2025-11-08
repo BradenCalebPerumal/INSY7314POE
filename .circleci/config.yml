@@ -2,6 +2,7 @@ version: 2.1
 
 executors:
   node_with_mongo:
+    # ... (unchanged)
     docker:
       - image: cimg/node:20.11
       - image: mongo:7.0
@@ -10,28 +11,17 @@ executors:
   # Standard executor for Sonar Scan steps
   node_exec:
     docker:
-      - image: cimg/node:20.11 # Use a Node image to ensure node/npm tools are available if needed
+      - image: cimg/node:20.11
     working_directory: ~/project
-
-# --- The custom 'sonar_exec' executor is removed ---
 
 jobs:
   build_test:
-    executor: node_with_mongo
-    environment:
-      # ... (All existing environment variables remain unchanged)
-      NODE_ENV: test
-      NODE_OPTIONS: --experimental-vm-modules
-      CI: "true"
-      # ... (CORS, PWD_PEPPER, JWT, etc. remain unchanged)
-      ACCESS_TOKEN_TTL_MIN: "15"
-      REFRESH_TOKEN_TTL_DAYS: "7"
+    # ... (all steps remain unchanged)
     steps:
-      - checkout
-      # ... (All installation, wait, and test steps remain unchanged)
+      # ... (previous steps)
       - persist_to_workspace:
           root: .
-          # Persist the entire project folder for the scanner container to access source files
+          # CRITICAL: Persist the entire project folder for the scanner container to access all source files
           paths:
             - INSY7314-PAYMENT_PORTAL 
             
@@ -40,7 +30,7 @@ jobs:
     executor: node_exec
     environment:
       SONAR_HOST_URL: https://sonarcloud.io
-      # SONAR_TOKEN must be set in CircleCI project env vars
+      SONAR_TOKEN: "${SONAR_TOKEN}" # Ensure this is set as a CircleCI environment variable
     steps:
       - checkout
       - attach_workspace:
@@ -52,29 +42,30 @@ jobs:
       
       # 2. The 'docker run' command executes the Sonar scan using the official image
       - run:
-          name: SonarCloud scan using official image
+          name: SonarCloud scan using official image (Path Fix)
           command: |
-            # The docker command is now run inside the remote environment
+            # Mount the entire CircleCI project workspace into the container at /usr/src
             docker run --rm \
               -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
               -e SONAR_TOKEN="${SONAR_TOKEN}" \
-              -v "$(pwd)/INSY7314-PAYMENT_PORTAL:/usr/src" \
+              -v "$(pwd):/usr/src" \
               sonarsource/sonar-scanner-cli \
               -Dsonar.organization="bradencalebperumal" \
               -Dsonar.projectKey="BradenCalebPerumal_INSY7314POE" \
               -Dsonar.projectName="INSY7314POE" \
               -Dsonar.sourceEncoding="UTF-8" \
-              -Dsonar.projectBaseDir="/usr/src" \
+              # CRITICAL PATH FIX: Base directory is the subfolder inside the container
+              -Dsonar.projectBaseDir="/usr/src/INSY7314-PAYMENT_PORTAL" \
               -Dsonar.sources="backend/src,frontend/src" \
               -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" \
               -Dsonar.test.inclusions="**/*.{test,spec}.{js,jsx,ts,tsx}" \
-              -Dsonar.javascript.lcov.reportPaths="/usr/src/backend/coverage/lcov.info,/usr/src/frontend/coverage/lcov.info"
+              -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info,frontend/coverage/lcov.info"
 
 workflows:
   build_pipeline:
     jobs:
       - build_test
-      # Use the new job that relies on the official image
+      # Use the stable, path-corrected job
       - sonar_scan_official:
           requires:
             - build_test
