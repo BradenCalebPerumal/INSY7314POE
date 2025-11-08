@@ -478,6 +478,26 @@ The system enforces security via multiple layers, with a primary defense being s
 
 ---
 
+### 📸 Pipeline Screenshots
+
+Below are the screenshots demonstrating our automated CI/CD and code-analysis security workflow.
+
+#### ✅ CircleCI Build and SonarCloud Scan Pipeline
+
+![CircleCI Pipeline Screenshot](./docs/screenshots/circleci_pipeline.png)
+
+The above image shows the pipeline stages on every push to `main` — including install, test (with coverage), and SonarCloud scan stages — all succeeding before deployment.
+
+#### 🔍 SonarCloud Analysis Report
+
+![SonarCloud Report Screenshot](./docs/screenshots/sonarcloud_report.png)
+
+This screenshot highlights the **SonarCloud Dashboard** summarizing code coverage, maintainability rating, security hotspots, and vulnerability counts.  
+The scan confirms zero critical issues and no leaked secrets, verifying the system’s secure state before deployment.
+
+---
+
+
 ## 📚 11. References
 
 - **Argon2, n.d. Argon2 Library.** [online] _[npm (npmjs.com)](https://www.npmjs.com/package/argon2)_ [Accessed 08 October 2025].
