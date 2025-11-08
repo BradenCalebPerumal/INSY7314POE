@@ -1,128 +1,108 @@
+# .circleci/config.yml
 version: 2.1
 
 executors:
-  node_with_mongo:
+  docker_cli:
     docker:
-      # Primary container where your steps run
-      - image: cimg/node:20.11
-        environment:
-          NODE_ENV: test
-          NODE_OPTIONS: --experimental-vm-modules
-          CI: "true"
-          # minimal env for your env validation in CI
-          CORS_ORIGIN: https://localhost:5173
-          PWD_PEPPER: dummy_pepper_for_ci_1234
-          JWT_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef
-          DATA_KEY: a62b387f8738226611b593ce0d3aa9f134a60307c8b9bf6e5c4b4d3d7e0044b8
-          MONGO_URI: mongodb://localhost:27017/testdb   # <-- service container is reachable via localhost
-          SEND_EMAILS: "false"
-          SMTP_HOST: "localhost"
-          SMTP_USER: "ci"
-          SMTP_PASS: "ci"
-      # MongoDB service container (no auth)
-      - image: mongo:7
+      - image: cimg/base:stable
     working_directory: ~/project
 
-  sonar_executor:
+  sonar_exec:
     docker:
       - image: sonarsource/sonar-scanner-cli:5.0.1
     working_directory: ~/project
 
 jobs:
-  build_test:
-    executor: node_with_mongo
+  test_in_docker:
+    executor: docker_cli
     steps:
       - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
 
       - run:
-          name: Wait for Mongo to be ready
+          name: Build compose images
+          command: docker compose build --pull
+
+      - run:
+          name: Start Mongo
+          command: docker compose up -d mongo
+
+      - run:
+          name: Wait for Mongo
           command: |
             for i in $(seq 1 60); do
-              (echo > /dev/tcp/localhost/27017) >/dev/null 2>&1 && echo "Mongo up" && break
-              echo "Waiting for Mongo..."
+              docker run --rm --network "$(basename $PWD)_default" busybox sh -c "nc -z mongo 27017" \
+                && echo "Mongo is up" && exit 0 || echo "Waiting for Mongo..."
               sleep 1
             done
+            echo "Mongo not ready" && exit 1
 
       - run:
-          name: Install deps (backend)
+          name: Run tests inside API container
           command: |
-            cd INSY7314-PAYMENT_PORTAL/backend
-            if [ -f package-lock.json ]; then npm ci; else npm install; fi
+            rm -rf coverage-out
+            mkdir -p coverage-out
+            docker compose run --rm api sh -c "
+              npm ci &&
+              npm test --runInBand --coverage --coverageReporters=lcov &&
+              mkdir -p /usr/src/app/coverage &&
+              cp -f coverage/lcov.info /usr/src/app/coverage/lcov.info
+            "
+            docker cp $(docker ps -aqf "name=insy7314-api-dev"):/usr/src/app/coverage/lcov.info ./coverage-out/lcov.info || true
 
       - run:
-          name: Jest coverage (backend)
+          name: Verify coverage
           command: |
-            cd INSY7314-PAYMENT_PORTAL/backend
-            npm test --runInBand --coverage --coverageReporters=lcov
-
-      - run:
-          name: Ensure coverage exists for Sonar
-          command: |
-            set -euxo pipefail
-            COV_DIR="INSY7314-PAYMENT_PORTAL/backend/coverage"
-            mkdir -p "$COV_DIR"
-            if [ ! -f "$COV_DIR/lcov.info" ]; then
-              echo "TN:" > "$COV_DIR/lcov.info"
-              echo "Created placeholder $COV_DIR/lcov.info"
-            fi
-            ls -lah "$COV_DIR" || true
+            ls -lah coverage-out || true
+            test -f coverage-out/lcov.info || (echo "lcov.info missing" && exit 1)
 
       - persist_to_workspace:
           root: .
           paths:
-            - INSY7314-PAYMENT_PORTAL/backend/coverage
+            - coverage-out
+
+      - run:
+          name: Cleanup
+          when: always
+          command: docker compose down -v || true
 
   sonar_scan:
-    executor: sonar_executor
+    executor: sonar_exec
     environment:
-      SONAR_HOST_URL: https://sonarcloud.io
-      # SONAR_TOKEN must be set in CircleCI Project Settings → Environment Variables
+      SONAR_HOST_URL: "https://sonarcloud.io"
+      SONAR_ORG: "bradencalebperumal"
+      SONAR_PROJECT_KEY: "bradencalebperumal_INSY7314POE"
     steps:
       - checkout
       - attach_workspace:
           at: .
 
       - run:
-          name: Show repo tree for debugging
+          name: Place coverage where Sonar expects it
           command: |
-            ls -la
-            ls -la INSY7314-PAYMENT_PORTAL || true
-            ls -la INSY7314-PAYMENT_PORTAL/backend || true
-            ls -la INSY7314-PAYMENT_PORTAL/frontend || true
+            mkdir -p INSY7314-PAYMENT_PORTAL/backend/coverage
+            cp -f coverage-out/lcov.info INSY7314-PAYMENT_PORTAL/backend/coverage/lcov.info
 
       - run:
-          name: Build sonar sources list (backend/src + optional frontend/src)
+          name: Run SonarCloud scan
           command: |
-            set -e
-            BASE="INSY7314-PAYMENT_PORTAL"
-            SRC_LIST="backend/src"
-            if [ -d "$BASE/frontend/src" ]; then
-              SRC_LIST="$SRC_LIST,frontend/src"
-            fi
-            echo "SOURCES=$SRC_LIST" >> $BASH_ENV
-            echo "Computed SOURCES=$SRC_LIST"
-
-      - run:
-          name: SonarCloud scan
-          command: |
-            source $BASH_ENV
             sonar-scanner \
               -Dsonar.host.url="${SONAR_HOST_URL}" \
               -Dsonar.login="${SONAR_TOKEN}" \
-              -Dsonar.organization="bradencalebperumal" \
-              -Dsonar.projectKey="bradencalebperumal_INSY7314POE" \
+              -Dsonar.organization="${SONAR_ORG}" \
+              -Dsonar.projectKey="${SONAR_PROJECT_KEY}" \
               -Dsonar.projectName="INSY7314POE" \
-              -Dsonar.sourceEncoding="UTF-8" \
               -Dsonar.projectBaseDir="INSY7314-PAYMENT_PORTAL" \
-              -Dsonar.sources="${SOURCES}" \
-              -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" \
-              -Dsonar.test.inclusions="**/*.{test,spec}.{js,jsx,ts,tsx}" \
-              -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info"
+              -Dsonar.sources="backend/src,frontend/src" \
+              -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info" \
+              -Dsonar.sourceEncoding="UTF-8" \
+              -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**"
 
 workflows:
-  build_pipeline:
+  pipeline:
     jobs:
-      - build_test
+      - test_in_docker
       - sonar_scan:
           requires:
-            - build_test
+            - test_in_docker
