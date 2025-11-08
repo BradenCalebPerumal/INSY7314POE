@@ -7,7 +7,6 @@ executors:
       - image: mongo:7.0
     working_directory: ~/project
 
-  # Standard executor for Sonar Scan steps (used for setup_remote_docker)
   node_exec:
     docker:
       - image: cimg/node:20.11
@@ -96,18 +95,15 @@ jobs:
             COV_DIR_B="INSY7314-PAYMENT_PORTAL/backend/coverage"
             COV_DIR_F="INSY7314-PAYMENT_PORTAL/frontend/coverage"
             mkdir -p "$COV_DIR_B" "$COV_DIR_F"
-            # Create a minimal LCOV if tests didn't produce one
-            if [ ! -f "$COV_DIR_B/lcov.info" ]; then echo "TN:" > "$COV_DIR_B/lcov.info"; fi
-            if [ ! -f "$COV_DIR_F/lcov.info" ]; then echo "TN:" > "$COV_DIR_F/lcov.info"; fi
+            [ -f "$COV_DIR_B/lcov.info" ] || echo "TN:" > "$COV_DIR_B/lcov.info"
+            [ -f "$COV_DIR_F/lcov.info" ] || echo "TN:" > "$COV_DIR_F/lcov.info"
             ls -lah "$COV_DIR_B" "$COV_DIR_F" || true
 
       - persist_to_workspace:
           root: .
-          # CRITICAL: Persist the entire project folder for the scanner container to access all source files
           paths:
-            - INSY7314-PAYMENT_PORTAL 
-            
-  # 🏆 FINAL, STABLE JOB: Runs the scan using the official SonarSource image with remote Docker
+            - INSY7314-PAYMENT_PORTAL
+
   sonar_scan_official:
     executor: node_exec
     environment:
@@ -117,16 +113,19 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
-      
-      # 1. CRITICAL FIX: Set up a remote Docker environment
+
       - setup_remote_docker:
           docker_layer_caching: false
-      
-      # 2. The 'docker run' command executes the Sonar scan using the official image
+
+      - run:
+          name: Debug workspace contents
+          command: |
+            ls -al
+            ls -al INSY7314-PAYMENT_PORTAL || true
+
       - run:
           name: SonarCloud scan using official image (Path Fix)
           command: |
-            # Mount the entire CircleCI project workspace into the container at /usr/src
             docker run --rm \
               -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
               -e SONAR_TOKEN="${SONAR_TOKEN}" \
@@ -136,7 +135,6 @@ jobs:
               -Dsonar.projectKey="BradenCalebPerumal_INSY7314POE" \
               -Dsonar.projectName="INSY7314POE" \
               -Dsonar.sourceEncoding="UTF-8" \
-              # CRITICAL PATH FIX: Base directory is the subfolder inside the container
               -Dsonar.projectBaseDir="/usr/src/INSY7314-PAYMENT_PORTAL" \
               -Dsonar.sources="backend/src,frontend/src" \
               -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" \
@@ -147,7 +145,6 @@ workflows:
   build_pipeline:
     jobs:
       - build_test
-      # Use the stable, path-corrected job
       - sonar_scan_official:
           requires:
             - build_test
