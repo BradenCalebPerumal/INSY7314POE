@@ -124,18 +124,11 @@ jobs:
       - run:
           name: SonarCloud scan using official image (Path Fix)
           command: |
-            # 0) Host-side sanity check
-            ls -al
-            ls -al INSY7314-PAYMENT_PORTAL || true
-            ls -al INSY7314-PAYMENT_PORTAL/backend/src || true
-            ls -al INSY7314-PAYMENT_PORTAL/frontend/src || true
+            # host-side checks (optional)
+            ls -al INSY7314-PAYMENT_PORTAL/backend || true
+            ls -al INSY7314-PAYMENT_PORTAL/frontend || true
 
-            # 1) Container-side sanity check (lists paths inside the container mount)
-            docker run --rm \
-              -v "$(pwd)/INSY7314-PAYMENT_PORTAL:/src" \
-              alpine:3.20 sh -lc 'ls -al /src && ls -al /src/backend/src && ls -al /src/frontend/src'
-
-            # 2) Actual Sonar scan
+            # run scan
             docker run --rm \
               -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
               -e SONAR_TOKEN="${SONAR_TOKEN}" \
@@ -147,9 +140,10 @@ jobs:
               -Dsonar.projectName="INSY7314POE" \
               -Dsonar.sourceEncoding="UTF-8" \
               -Dsonar.projectBaseDir="/src" \
-              -Dsonar.sources="backend/src,frontend/src" \
-              -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" \
+              -Dsonar.sources="backend,frontend" \
+              -Dsonar.tests="backend/tests,frontend/tests" \
               -Dsonar.test.inclusions="**/*.{test,spec}.{js,jsx,ts,tsx}" \
+              -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" \
               -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info,frontend/coverage/lcov.info"
 
 workflows:
