@@ -86,21 +86,9 @@ jobs:
     steps:
       - checkout
       - run:
-          name: SonarCloud scan (DEBUG MODE) 🐛
+          name: SonarCloud scan (SINGLE-LINE DEBUG) 🐛
           command: |
-            sonar-scanner -X \
-              -Dsonar.host.url="${SONAR_HOST_URL}" \
-              -Dsonar.login="${SONAR_TOKEN}" \
-              -Dsonar.organization="bradencalebperumal" \
-              -Dsonar.projectKey="bradencalebperumal_INSY7314POE" \
-              -Dsonar.projectName="INSY7314POE" \
-              -Dsonar.sourceEncoding="UTF-8" \
-              -Dsonar.projectBaseDir="INSY7314-PAYMENT_PORTAL" \
-              -Dsonar.sources="backend/src" \
-              -Dsonar.tests="backend/tests" \
-              -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" \
-              -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info" \
-              -Dsonar.branch.name="${CIRCLE_BRANCH}"
+            sonar-scanner -X -Dsonar.host.url="${SONAR_HOST_URL}" -Dsonar.login="${SONAR_TOKEN}" -Dsonar.organization="bradencalebperumal" -Dsonar.projectKey="bradencalebperumal_INSY7314POE" -Dsonar.projectName="INSY7314POE" -Dsonar.sourceEncoding="UTF-8" -Dsonar.projectBaseDir="INSY7314-PAYMENT_PORTAL" -Dsonar.sources="backend/src" -Dsonar.tests="backend/tests" -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info" -Dsonar.branch.name="${CIRCLE_BRANCH}"
 
 workflows:
   build_pipeline:
