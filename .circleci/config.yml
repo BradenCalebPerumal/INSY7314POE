@@ -86,9 +86,9 @@ jobs:
     steps:
       - checkout
       - run:
-          name: SonarCloud scan
+          name: SonarCloud scan (DEBUG MODE) 🐛
           command: |
-            sonar-scanner \
+            sonar-scanner -X \ # <-- ADDED DEBUG FLAG
               -Dsonar.host.url="${SONAR_HOST_URL}" \
               -Dsonar.login="${SONAR_TOKEN}" \
               -Dsonar.organization="bradencalebperumal" \
@@ -100,7 +100,7 @@ jobs:
               -Dsonar.tests="backend/tests" \
               -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" \
               -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info" \
-              -Dsonar.branch.name="main"
+              -Dsonar.branch.name="${CIRCLE_BRANCH}" # <-- Using CircleCI variable for robustness
 
 workflows:
   build_pipeline:
