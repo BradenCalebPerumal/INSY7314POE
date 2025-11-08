@@ -6,6 +6,12 @@ executors:
       - image: cimg/node:20.11
     working_directory: ~/project
 
+  # 👇 Scanner comes preinstalled here — no curl, no unzip, no Java setup
+  sonar_executor:
+    docker:
+      - image: sonarsource/sonar-scanner-cli:6.2.1
+    working_directory: ~/project
+
 jobs:
   build_test:
     executor: node_executor
@@ -13,8 +19,6 @@ jobs:
       NODE_ENV: test
       NODE_OPTIONS: --experimental-vm-modules
       CI: "true"
-
-      # --- backend environment variables (valid dummy values) ---
       CORS_ORIGIN: https://localhost:5173
       PWD_PEPPER: dummy_pepper_for_ci
       JWT_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef
@@ -27,28 +31,23 @@ jobs:
       SEND_EMAILS: "false"
       ACCESS_TOKEN_TTL_MIN: "15"
       REFRESH_TOKEN_TTL_DAYS: "7"
-
     steps:
       - checkout
-
       - run:
           name: Install deps (backend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             if [ -f package-lock.json ]; then npm ci; else npm install; fi
-
       - run:
           name: Lint backend (non-blocking)
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             npm run lint || true
-
       - run:
           name: Run tests with coverage (backend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             npm test --runInBand --coverage --coverageReporters=lcov
-
       - run:
           name: Install deps (frontend) if present
           command: |
@@ -56,7 +55,6 @@ jobs:
               cd INSY7314-PAYMENT_PORTAL/frontend
               if [ -f package-lock.json ]; then npm ci; else npm install; fi
             fi
-
       - run:
           name: Lint frontend (non-blocking) if present
           command: |
@@ -64,7 +62,6 @@ jobs:
               cd INSY7314-PAYMENT_PORTAL/frontend
               npm run lint || true
             fi
-
       - run:
           name: Build frontend (if present)
           command: |
@@ -74,36 +71,27 @@ jobs:
             fi
 
   sonar_scan:
-    executor: node_executor
+    executor: sonar_executor
+    environment:
+      # SONAR_TOKEN should be provided via a CircleCI Context or project env var (masked)
+      SONAR_HOST_URL: https://sonarcloud.io
     steps:
       - checkout
       - run:
-          name: Install Java + unzip
-          command: |
-            sudo apt-get update
-            sudo apt-get install -y openjdk-17-jre-headless unzip
-            java -version
-      - run:
-          name: Download sonar-scanner (CLI)
-          command: |
-            set -e
-            SC_VERSION=6.2.1.4610
-            SC_ZIP="sonar-scanner-${SC_VERSION}-linux-x64.zip"
-            SC_URL="https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/${SC_ZIP}"
-            echo "Downloading ${SC_URL}"
-            curl -fsSL -o "${SC_ZIP}" -L "${SC_URL}"
-            unzip -q "${SC_ZIP}"
-            SC_DIR="sonar-scanner-${SC_VERSION}-linux-x64"
-            echo 'export PATH="$PWD/'"${SC_DIR}"'/bin:$PATH"' >> $BASH_ENV
-            echo 'export SONAR_SCANNER_OPTS="-Xmx1024m"' >> $BASH_ENV
-            source $BASH_ENV
-            sonar-scanner -v
-      - run:
-          name: Run SonarCloud analysis
+          name: SonarCloud scan (no download)
           command: |
             sonar-scanner \
-              -Dsonar.host.url=https://sonarcloud.io \
-              -Dsonar.login=$SONAR_TOKEN
+              -Dsonar.host.url="${SONAR_HOST_URL}" \
+              -Dsonar.login="${SONAR_TOKEN}" \
+              -Dsonar.organization="bradencalebperumal" \
+              -Dsonar.projectKey="bradencalebperumal_INSY7314POE" \
+              -Dsonar.projectName="INSY7314POE" \
+              -Dsonar.sourceEncoding="UTF-8" \
+              -Dsonar.projectBaseDir="INSY7314-PAYMENT_PORTAL" \
+              -Dsonar.sources="INSY7314-PAYMENT_PORTAL/backend/src,INSY7314-PAYMENT_PORTAL/frontend/src" \
+              -Dsonar.tests="INSY7314-PAYMENT_PORTAL/backend/tests,INSY7314-PAYMENT_PORTAL/frontend/tests" \
+              -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" \
+              -Dsonar.javascript.lcov.reportPaths="INSY7314-PAYMENT_PORTAL/backend/coverage/lcov.info"
 
 workflows:
   build_pipeline:
