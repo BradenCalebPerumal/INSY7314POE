@@ -14,24 +14,26 @@ jobs:
     executor: node_executor
     steps:
       - checkout
-
       - run:
-          name: Install dependencies
+          name: Install deps (backend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             npm ci
-
       - run:
-          name: Run tests with coverage
+          name: Run tests with coverage (backend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             npm test -- --coverage --coverageReporters=lcov
-
       - run:
-          name: Copy coverage to repo root (for Sonar)
+          name: Install deps (frontend) - optional
           command: |
-            mkdir -p coverage
-            cp INSY7314-PAYMENT_PORTAL/backend/coverage/lcov.info coverage/lcov.info || true
+            cd INSY7314-PAYMENT_PORTAL/frontend || exit 0
+            [ -f package.json ] && npm ci || true
+      - run:
+          name: Run tests with coverage (frontend) - optional
+          command: |
+            cd INSY7314-PAYMENT_PORTAL/frontend || exit 0
+            [ -f package.json ] && npm test -- --coverage --coverageReporters=lcov || true
 
 workflows:
   build_pipeline:
@@ -40,4 +42,4 @@ workflows:
       - sonarcloud/scan:
           requires:
             - build_test
-          context: sonarcloud   # holds SONAR_TOKEN etc.
+          context: sonarcloud
