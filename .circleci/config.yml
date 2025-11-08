@@ -99,7 +99,8 @@ jobs:
               -Dsonar.sources="backend/src" \
               -Dsonar.tests="backend/tests" \
               -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" \
-              -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info"
+              -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info" \
+              -Dsonar.branch.name="main"
 
 workflows:
   build_pipeline:
