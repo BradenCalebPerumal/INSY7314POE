@@ -10,55 +10,45 @@ jobs:
   build_test:
     executor: node_executor
     environment:
-      # match GH Actions
       NODE_ENV: test
       NODE_OPTIONS: --experimental-vm-modules
       CI: "true"
 
-      # ===== satisfy your backend env schema (same vars as your GH workflow) =====
-      # use a single plain string (NOT JSON) so your parser doesn't reject it
+      # --- backend environment variables (valid dummy values) ---
       CORS_ORIGIN: https://localhost:5173
-
-      # length/format-constrained secrets (dummy but valid)
-      PWD_PEPPER: dummy_pepper_for_ci                     # ≥16 chars
-      JWT_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef   # ≥32 chars
-      DATA_KEY: a62b387f8738226611b593ce0d3aa9f134a60307c8b9bf6e5c4b4d3d7e0044b8  # 64 hex
-
-      # DB (if tests don’t connect, it won’t be used; still satisfies schema)
+      PWD_PEPPER: dummy_pepper_for_ci
+      JWT_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef
+      DATA_KEY: a62b387f8738226611b593ce0d3aa9f134a60307c8b9bf6e5c4b4d3d7e0044b8
       MONGO_URI: mongodb://127.0.0.1:27017/testdb
-
-      # mail (dummy)
       SMTP_HOST: smtp.example.com
       SMTP_USER: ci@example.com
       SMTP_PASS: dummy123
       EMAIL_FROM: ci@example.com
       SEND_EMAILS: "false"
-
-      # tokens ttl (strings)
       ACCESS_TOKEN_TTL_MIN: "15"
       REFRESH_TOKEN_TTL_DAYS: "7"
 
     steps:
       - checkout
 
-      # ---- BACKEND ----
       - run:
           name: Install deps (backend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
       - run:
           name: Lint backend (non-blocking)
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             npm run lint || true
+
       - run:
           name: Run tests with coverage (backend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             npm test --runInBand --coverage --coverageReporters=lcov
 
-      # ---- FRONTEND (optional; runs only if folder exists) ----
       - run:
           name: Install deps (frontend) if present
           command: |
@@ -66,6 +56,7 @@ jobs:
               cd INSY7314-PAYMENT_PORTAL/frontend
               if [ -f package-lock.json ]; then npm ci; else npm install; fi
             fi
+
       - run:
           name: Lint frontend (non-blocking) if present
           command: |
@@ -73,6 +64,7 @@ jobs:
               cd INSY7314-PAYMENT_PORTAL/frontend
               npm run lint || true
             fi
+
       - run:
           name: Build frontend (if present)
           command: |
@@ -86,20 +78,26 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Install Java (required by sonar-scanner)
+          name: Install Java + unzip
           command: |
             sudo apt-get update
-            sudo apt-get install -y openjdk-17-jre-headless
+            sudo apt-get install -y openjdk-17-jre-headless unzip
             java -version
       - run:
-          name: Download sonar-scanner
+          name: Download sonar-scanner (CLI)
           command: |
-            curl -sSLo sonar-scanner.zip \
-              https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-5.0.1.3006-linux.zip
-            unzip -q sonar-scanner.zip
-            echo 'export PATH="$PWD/sonar-scanner-5.0.1.3006-linux/bin:$PATH"' >> $BASH_ENV
+            set -e
+            SC_VERSION=6.2.1.4610
+            SC_ZIP="sonar-scanner-${SC_VERSION}-linux-x64.zip"
+            SC_URL="https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/${SC_ZIP}"
+            echo "Downloading ${SC_URL}"
+            curl -fsSL -o "${SC_ZIP}" -L "${SC_URL}"
+            unzip -q "${SC_ZIP}"
+            SC_DIR="sonar-scanner-${SC_VERSION}-linux-x64"
+            echo 'export PATH="$PWD/'"${SC_DIR}"'/bin:$PATH"' >> $BASH_ENV
             echo 'export SONAR_SCANNER_OPTS="-Xmx1024m"' >> $BASH_ENV
             source $BASH_ENV
+            sonar-scanner -v
       - run:
           name: Run SonarCloud analysis
           command: |
