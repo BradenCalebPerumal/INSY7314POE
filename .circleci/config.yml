@@ -17,30 +17,34 @@ jobs:
   build_test:
     executor: node_with_mongo
     environment:
-      # ... (Environment variables remain unchanged) ...
       NODE_ENV: test
       NODE_OPTIONS: --experimental-vm-modules
       CI: "true"
+
+      # --- Backend env (dummy but valid) ---
       CORS_ORIGIN: https://localhost:5173
       PWD_PEPPER: pepper_dev_secret_123456
       JWT_SECRET: jwt_dev_secret_abcdefghijklmnopqrstuvwxyz_1234567890
       DATA_KEY: a62b387f8738226611b593ce0d3aa9f134a60307c8b9bf6e5c4b4d3d7e0044b8
       MONGO_URI: mongodb://127.0.0.1:27017/testdb
+
       SEND_EMAILS: "false"
       SMTP_HOST: localhost
       SMTP_USER: ci@example.com
       SMTP_PASS: dummy-password
       EMAIL_FROM: ci@example.com
+
       ACCESS_TOKEN_TTL_MIN: "15"
       REFRESH_TOKEN_TTL_DAYS: "7"
     steps:
       - checkout
-      # ... (Install netcat, Wait for Mongo, Build & Test steps remain unchanged) ...
+
       - run:
           name: Install netcat for port checks
           command: |
             sudo apt-get update
             sudo apt-get install -y netcat-openbsd
+
       - run:
           name: Wait for Mongo (max 120s)
           command: |
@@ -51,31 +55,40 @@ jobs:
               echo "Waiting for Mongo... ($i/60)"
               sleep 2
             done
+
+      # --- Backend Build & Test ---
       - run:
           name: Install deps (backend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
       - run:
           name: Lint backend (non-blocking)
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             npm run lint || true
+
       - run:
           name: Jest coverage (backend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             npm test --runInBand --coverage --coverageReporters=lcov
+
+      # --- Frontend Build & Test ---
       - run:
           name: Install deps (frontend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/frontend
             if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
       - run:
           name: Jest coverage (frontend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/frontend
             npm test --runInBand --coverage --coverageReporters=lcov
+
+      # --- Coverage Setup ---
       - run:
           name: Ensure coverage exists for Sonar
           command: |
@@ -83,16 +96,18 @@ jobs:
             COV_DIR_B="INSY7314-PAYMENT_PORTAL/backend/coverage"
             COV_DIR_F="INSY7314-PAYMENT_PORTAL/frontend/coverage"
             mkdir -p "$COV_DIR_B" "$COV_DIR_F"
+            # Create a minimal LCOV if tests didn't produce one
             if [ ! -f "$COV_DIR_B/lcov.info" ]; then echo "TN:" > "$COV_DIR_B/lcov.info"; fi
             if [ ! -f "$COV_DIR_F/lcov.info" ]; then echo "TN:" > "$COV_DIR_F/lcov.info"; fi
             ls -lah "$COV_DIR_B" "$COV_DIR_F" || true
 
       - persist_to_workspace:
           root: .
-          # Persist the entire project folder
+          # CRITICAL: Persist the entire project folder for the scanner container to access all source files
           paths:
             - INSY7314-PAYMENT_PORTAL 
             
+  # 🏆 FINAL, STABLE JOB: Runs the scan using the official SonarSource image with remote Docker
   sonar_scan_official:
     executor: node_exec
     environment:
@@ -103,16 +118,15 @@ jobs:
       - attach_workspace:
           at: .
       
-      # 1. FIX: Set up a remote Docker environment
+      # 1. CRITICAL FIX: Set up a remote Docker environment
       - setup_remote_docker:
           docker_layer_caching: false
       
-      # 2. FINAL FIX: Corrected shell syntax and final path correction
+      # 2. The 'docker run' command executes the Sonar scan using the official image
       - run:
-          name: SonarCloud scan (Final Working)
+          name: SonarCloud scan using official image (Path Fix)
           command: |
-            # The entire project workspace (including INSY7314-PAYMENT_PORTAL) is mounted to /usr/src
-            # The projectBaseDir is set to the subfolder INSY7314-PAYMENT_PORTAL
+            # Mount the entire CircleCI project workspace into the container at /usr/src
             docker run --rm \
               -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
               -e SONAR_TOKEN="${SONAR_TOKEN}" \
@@ -122,18 +136,18 @@ jobs:
               -Dsonar.projectKey="BradenCalebPerumal_INSY7314POE" \
               -Dsonar.projectName="INSY7314POE" \
               -Dsonar.sourceEncoding="UTF-8" \
+              # CRITICAL PATH FIX: Base directory is the subfolder inside the container
               -Dsonar.projectBaseDir="/usr/src/INSY7314-PAYMENT_PORTAL" \
               -Dsonar.sources="backend/src,frontend/src" \
               -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" \
               -Dsonar.test.inclusions="**/*.{test,spec}.{js,jsx,ts,tsx}" \
-              # FINAL PATH FIX: The lcov report paths must be relative to the projectBaseDir,
-              # which is /usr/src/INSY7314-PAYMENT_PORTAL inside the container.
               -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info,frontend/coverage/lcov.info"
 
 workflows:
   build_pipeline:
     jobs:
       - build_test
+      # Use the stable, path-corrected job
       - sonar_scan_official:
           requires:
             - build_test
