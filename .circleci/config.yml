@@ -7,7 +7,6 @@ executors:
       - image: mongo:7.0
     working_directory: ~/project
 
-  # Standard executor for Sonar Scan steps (used for setup_remote_docker)
   node_exec:
     docker:
       - image: cimg/node:20.11
@@ -20,20 +19,17 @@ jobs:
       NODE_ENV: test
       NODE_OPTIONS: --experimental-vm-modules
       CI: "true"
-
       # --- Backend env (dummy but valid) ---
       CORS_ORIGIN: https://localhost:5173
       PWD_PEPPER: pepper_dev_secret_123456
       JWT_SECRET: jwt_dev_secret_abcdefghijklmnopqrstuvwxyz_1234567890
       DATA_KEY: a62b387f8738226611b593ce0d3aa9f134a60307c8b9bf6e5c4b4d3d7e0044b8
       MONGO_URI: mongodb://127.0.0.1:27017/testdb
-
       SEND_EMAILS: "false"
       SMTP_HOST: localhost
       SMTP_USER: ci@example.com
       SMTP_PASS: dummy-password
       EMAIL_FROM: ci@example.com
-
       ACCESS_TOKEN_TTL_MIN: "15"
       REFRESH_TOKEN_TTL_DAYS: "7"
     steps:
@@ -56,7 +52,7 @@ jobs:
               sleep 2
             done
 
-      # --- Backend Build & Test ---
+      # --- Backend ---
       - run:
           name: Install deps (backend)
           command: |
@@ -75,7 +71,7 @@ jobs:
             cd INSY7314-PAYMENT_PORTAL/backend
             npm test --runInBand --coverage --coverageReporters=lcov
 
-      # --- Frontend Build & Test ---
+      # --- Frontend ---
       - run:
           name: Install deps (frontend)
           command: |
@@ -88,7 +84,7 @@ jobs:
             cd INSY7314-PAYMENT_PORTAL/frontend
             npm test --runInBand --coverage --coverageReporters=lcov
 
-      # --- Coverage Setup ---
+      # --- Coverage fallback ---
       - run:
           name: Ensure coverage exists for Sonar
           command: |
@@ -96,47 +92,92 @@ jobs:
             COV_DIR_B="INSY7314-PAYMENT_PORTAL/backend/coverage"
             COV_DIR_F="INSY7314-PAYMENT_PORTAL/frontend/coverage"
             mkdir -p "$COV_DIR_B" "$COV_DIR_F"
-            # Create a minimal LCOV if tests didn't produce one
-            if [ ! -f "$COV_DIR_B/lcov.info" ]; then echo "TN:" > "$COV_DIR_B/lcov.info"; fi
-            if [ ! -f "$COV_DIR_F/lcov.info" ]; then echo "TN:" > "$COV_DIR_F/lcov.info"; fi
+            [ -f "$COV_DIR_B/lcov.info" ] || echo "TN:" > "$COV_DIR_B/lcov.info"
+            [ -f "$COV_DIR_F/lcov.info" ] || echo "TN:" > "$COV_DIR_F/lcov.info"
             ls -lah "$COV_DIR_B" "$COV_DIR_F" || true
 
+      # persist the project for the sonar job
       - persist_to_workspace:
           root: .
-          # CRITICAL: Persist the entire project folder for the scanner container to access all source files
           paths:
-            - INSY7314-PAYMENT_PORTAL 
-            
-  # 🏆 FINAL, STABLE JOB: Runs the scan using the official SonarSource image with remote Docker
+            - INSY7314-PAYMENT_PORTAL
+
+  # Sonar scan using remote Docker (no bind mounts; uses a volume container)
   sonar_scan_official:
     executor: node_exec
     environment:
       SONAR_HOST_URL: https://sonarcloud.io
-      # SONAR_TOKEN must be set in CircleCI project env vars
+      # SONAR_TOKEN must be set in CircleCI project variables
     steps:
       - checkout
       - attach_workspace:
           at: .
-      
-      # 1. CRITICAL FIX: Set up a remote Docker environment
+
       - setup_remote_docker:
           docker_layer_caching: false
+
+      # Create a volume container and copy project into it
       - run:
-          name: Verify backend/tests exists inside container
+          name: Prepare source volume for remote Docker
           command: |
+            set -euxo pipefail
+            docker rm -f srcvol || true
+            docker create -v /src --name srcvol alpine:3.20 /bin/true
+            # copy only the subfolder we need
+            docker cp INSY7314-PAYMENT_PORTAL/. srcvol:/src
+
+            # verify inside the volume container
+            docker run --rm --volumes-from srcvol alpine:3.20 sh -lc '
+              echo "== /src ==" && ls -al /src;
+              echo "== /src/backend ==" && ls -al /src/backend || true;
+              echo "== /src/backend/src ==" && ls -al /src/backend/src || true;
+              echo "== /src/backend/tests ==" && ls -al /src/backend/tests || true;
+              echo "== /src/frontend ==" && ls -al /src/frontend || true;
+              echo "== /src/frontend/src ==" && ls -al /src/frontend/src || true;
+              echo "== coverage files ==";
+              ls -al /src/backend/coverage/lcov.info || true;
+              ls -al /src/frontend/coverage/lcov.info || true;
+            '
+
+      # Run Sonar scanner using the volume container
+      - run:
+          name: SonarCloud scan (remote Docker safe)
+          command: |
+            set -euxo pipefail
+
+            # Build optional sonar.tests property only if folders exist
+            TESTS_PROP=""
+            docker run --rm --volumes-from srcvol alpine:3.20 sh -lc '
+              [ -d /src/backend/tests ] && echo backend/tests || true
+            ' > /tmp/btests || true
+            docker run --rm --volumes-from srcvol alpine:3.20 sh -lc '
+              [ -d /src/frontend/tests ] && echo frontend/tests || true
+            ' > /tmp/ftests || true
+
+            if [ -s /tmp/btests ] || [ -s /tmp/ftests ]; then
+              TESTS_PROP="-Dsonar.tests=$(paste -sd, /tmp/btests /tmp/ftests | sed "s/^,//;s/,$//")"
+            fi
+
             docker run --rm \
-              -v "$(pwd)/INSY7314-PAYMENT_PORTAL:/src" \
-              alpine:3.20 sh -lc '
-                echo "=== List /src ==="; ls -al /src;
-                echo "=== List /src/backend ==="; ls -al /src/backend || true;
-                echo "=== List /src/backend/tests ==="; ls -al /src/backend/tests || true;
-              '
+              --volumes-from srcvol \
+              -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
+              -e SONAR_TOKEN="${SONAR_TOKEN}" \
+              sonarsource/sonar-scanner-cli \
+              -Dsonar.organization="bradencalebperumal" \
+              -Dsonar.projectKey="BradenCalebPerumal_INSY7314POE" \
+              -Dsonar.projectName="INSY7314POE" \
+              -Dsonar.sourceEncoding="UTF-8" \
+              -Dsonar.projectBaseDir="/src" \
+              -Dsonar.sources="backend/src,frontend/src" \
+              -Dsonar.test.inclusions="**/*.{test,spec}.{js,jsx,ts,tsx}" \
+              -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" \
+              -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info,frontend/coverage/lcov.info" \
+              ${TESTS_PROP:+$TESTS_PROP}
 
 workflows:
   build_pipeline:
     jobs:
       - build_test
-      # Use the stable, path-corrected job
       - sonar_scan_official:
           requires:
             - build_test
