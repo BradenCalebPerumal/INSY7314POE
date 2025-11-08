@@ -7,7 +7,7 @@ executors:
       - image: mongo:7.0
     working_directory: ~/project
 
-  # UPDATED EXECUTOR: Use Node image and install scanner in job steps
+  # Executor uses a Node image to ensure JS runtime is available
   sonar_exec:
     docker:
       - image: cimg/node:20.11
@@ -26,7 +26,7 @@ jobs:
       PWD_PEPPER: pepper_dev_secret_123456
       JWT_SECRET: jwt_dev_secret_abcdefghijklmnopqrstuvwxyz_1234567890
       DATA_KEY: a62b387f8738226611b593ce0d3aa9f134a60307c8b9bf6e5c4b4d3d7e0044b8
-      MONGO_URI: mongodb://127.0.0.1:27017/testdb
+      MONGO_URI: mongodb://127.0.0.0.1:27017/testdb
 
       SEND_EMAILS: "false"
       SMTP_HOST: localhost
@@ -75,7 +75,7 @@ jobs:
             cd INSY7314-PAYMENT_PORTAL/backend
             npm test --runInBand --coverage --coverageReporters=lcov
 
-      # --- Frontend Build & Test (Integrated) ---
+      # --- Frontend Build & Test ---
       - run:
           name: Install deps (frontend)
           command: |
@@ -88,7 +88,7 @@ jobs:
             cd INSY7314-PAYMENT_PORTAL/frontend
             npm test --runInBand --coverage --coverageReporters=lcov
 
-      # --- Coverage Setup (Updated for both) ---
+      # --- Coverage Setup ---
       - run:
           name: Ensure coverage exists for Sonar
           command: |
@@ -117,10 +117,10 @@ jobs:
       - attach_workspace:
           at: .
 
-      # 🚀 FIX: Install Sonar Scanner CLI since Node image is used
+      # FIX: Install Sonar Scanner CLI without 'sudo' to avoid permission issues
       - run:
           name: Install Sonar Scanner CLI
-          command: sudo npm install -g sonar-scanner
+          command: npm install -g sonar-scanner
 
       - run:
           name: SonarCloud scan
