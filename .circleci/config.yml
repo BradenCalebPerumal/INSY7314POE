@@ -1,8 +1,5 @@
 version: 2.1
 
-orbs:
-  sonarcloud: sonarsource/sonarcloud@2.0.0
-
 executors:
   node_executor:
     docker:
@@ -14,19 +11,16 @@ jobs:
     executor: node_executor
     steps:
       - checkout
-
       - run:
           name: Install deps (backend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             npm ci
-
       - run:
           name: Run tests with coverage (backend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             npm test -- --coverage --coverageReporters=lcov
-
       - run:
           name: Install deps (frontend) if present
           command: |
@@ -34,7 +28,6 @@ jobs:
               cd INSY7314-PAYMENT_PORTAL/frontend
               npm ci
             fi
-
       - run:
           name: Run tests with coverage (frontend) if present
           command: |
@@ -43,11 +36,37 @@ jobs:
               npm test -- --coverage --coverageReporters=lcov
             fi
 
+  sonar_scan:
+    executor: node_executor
+    steps:
+      - checkout
+      - run:
+          name: Install Java (required by sonar-scanner)
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y openjdk-17-jre-headless
+            java -version
+      - run:
+          name: Download sonar-scanner
+          command: |
+            curl -sSLo sonar-scanner.zip \
+              https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-5.0.1.3006-linux.zip
+            unzip -q sonar-scanner.zip
+            echo 'export PATH="$PWD/sonar-scanner-5.0.1.3006-linux/bin:$PATH"' >> $BASH_ENV
+            echo 'export SONAR_SCANNER_OPTS="-Xmx1024m"' >> $BASH_ENV
+            source $BASH_ENV
+      - run:
+          name: Run SonarCloud analysis
+          command: |
+            # uses sonar-project.properties in repo
+            sonar-scanner \
+              -Dsonar.host.url=https://sonarcloud.io \
+              -Dsonar.login=$SONAR_TOKEN
+
 workflows:
   build_pipeline:
     jobs:
       - build_test
-      - sonarcloud/scan:
+      - sonar_scan:
           requires:
             - build_test
-          context: sonarcloud
