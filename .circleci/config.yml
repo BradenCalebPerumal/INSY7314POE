@@ -122,24 +122,15 @@ jobs:
       - setup_remote_docker:
           docker_layer_caching: false
       - run:
-          name: SonarCloud scan using official image (Final Fix)
+          name: Verify backend/tests exists inside container
           command: |
             docker run --rm \
-              -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
-              -e SONAR_TOKEN="${SONAR_TOKEN}" \
               -v "$(pwd)/INSY7314-PAYMENT_PORTAL:/src" \
-              -w /src \
-              sonarsource/sonar-scanner-cli \
-              -Dsonar.organization="bradencalebperumal" \
-              -Dsonar.projectKey="BradenCalebPerumal_INSY7314POE" \
-              -Dsonar.projectName="INSY7314POE" \
-              -Dsonar.sourceEncoding="UTF-8" \
-              -Dsonar.projectBaseDir="/src" \
-              -Dsonar.sources="backend/src,frontend/src" \
-              -Dsonar.tests="backend/tests" \
-              -Dsonar.test.inclusions="**/*.{test,spec}.{js,jsx,ts,tsx}" \
-              -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" \
-              -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info,frontend/coverage/lcov.info"
+              alpine:3.20 sh -lc '
+                echo "=== List /src ==="; ls -al /src;
+                echo "=== List /src/backend ==="; ls -al /src/backend || true;
+                echo "=== List /src/backend/tests ==="; ls -al /src/backend/tests || true;
+              '
 
 workflows:
   build_pipeline:
