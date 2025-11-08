@@ -12,16 +12,30 @@ jobs:
     environment:
       NODE_ENV: test
       CI: "true"
-      # === satisfy env schema in CI ===
-      PWD_PEPPER: "ci-pepper"
-      JWT_SECRET: "ci-jwt-secret"
-      DATA_KEY: "ci-data-key"
+
+      # ===== required by your env schema (CI-safe values) =====
+      # arrays are passed as JSON strings if your schema parses JSON
+      CORS_ORIGIN: '["http://localhost:5173","http://127.0.0.1:5173","http://example.com"]'
+
+      # length-constrained secrets
+      PWD_PEPPER: "ci_pwd_pepper_1234567890abcd"        # 28+ chars
+      JWT_SECRET: "ci_jwt_secret_1234567890_abcdefghijklmno1234567890"  # 48+ chars
+      DATA_KEY: "ci_data_key_1234567890abcd"
+
+      # mail (dummy)
       SMTP_HOST: "ci"
       SMTP_USER: "ci"
       SMTP_PASS: "ci"
       EMAIL_FROM: "ci@example.com"
       SEND_EMAILS: "false"
-      # add any other required keys your schema enforces here
+
+      # add any other strict keys your schema requires here
+      # GOOGLE_CLIENT_ID: "ci"
+      # GOOGLE_CLIENT_SECRET: "ci"
+      # CLOUDINARY_URL: "cloudinary://ci:ci@ci"
+      # PAYFAST_MERCHANT_ID: "ci"
+      # PAYFAST_MERCHANT_KEY: "ci"
+
     steps:
       - checkout
       - run:
