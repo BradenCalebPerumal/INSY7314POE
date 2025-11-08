@@ -12,7 +12,6 @@ import { env } from "./config/env.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// helper to read SSL files safely
 function readIfExists(p) {
   try { return fs.readFileSync(p); } catch { return null; }
 }
@@ -28,16 +27,19 @@ async function start() {
 
   const app = createApp();
 
-  const httpPort = Number(env.PORT) || 4000;
+  // ✅ align with compose/CI
+  const httpPort = Number(env.PORT) || 4001;
   const httpsPort = Number(process.env.HTTPS_PORT) || httpPort + 1;
 
-  // --- HTTPS server (self-signed for local dev) ---
+  // ✅ allow forcing HTTP in containers/CI to keep healthchecks simple
+  const forceHttp = String(process.env.USE_HTTPS || "false").toLowerCase() === "false";
+
+  // Local self-signed certs (for dev only)
   const sslDir = path.join(__dirname, "..", "ssl");
   const key = readIfExists(path.join(sslDir, "privatekey.pem"));
   const cert = readIfExists(path.join(sslDir, "certificate.pem"));
 
-  if (key && cert) {
-    // Strong TLS profile
+  if (!forceHttp && key && cert) {
     const tlsOptions = {
       key,
       cert,
@@ -53,14 +55,14 @@ async function start() {
       honorCipherOrder: true,
     };
 
-    // Real API on HTTPS
+    // HTTPS app
     const httpsServer = createHttpsServer(tlsOptions, app);
-    httpsServer.listen(httpsPort, () => {
-      console.log(`API (HTTPS) : https://localhost:${httpsPort}`);
-      console.log(`Health      : https://localhost:${httpsPort}/health`);
+    httpsServer.listen(httpsPort, "0.0.0.0", () => {
+      console.log(`API (HTTPS) : https://0.0.0.0:${httpsPort}`);
+      console.log(`Health      : https://0.0.0.0:${httpsPort}/health`);
     });
 
-    // HTTP redirector → always 301 to HTTPS
+    // HTTP -> HTTPS redirect
     const redirectApp = express();
     redirectApp.use((req, res) => {
       const hostOnly = (req.headers.host || `localhost:${httpPort}`).split(":")[0];
@@ -68,18 +70,15 @@ async function start() {
       res.redirect(301, location);
     });
     const httpServer = createHttpServer(redirectApp);
-    httpServer.listen(httpPort, () => {
-      console.log(`HTTP redirector : http://localhost:${httpPort}  →  https://localhost:${httpsPort}`);
+    httpServer.listen(httpPort, "0.0.0.0", () => {
+      console.log(`HTTP redirector : http://0.0.0.0:${httpPort}  →  https://0.0.0.0:${httpsPort}`);
     });
   } else {
-    console.warn(
-      "⚠️  HTTPS not started: missing ssl/privatekey.pem or ssl/certificate.pem.\n" +
-      "    Running HTTP only for development. Generate certs to enable HTTPS + redirect."
-    );
+    console.warn("⚠️  HTTPS disabled (USE_HTTPS=false or missing ssl/*). Running HTTP only.");
     const httpServer = createHttpServer(app);
-    httpServer.listen(httpPort, () => {
-      console.log(`API (HTTP only) : http://localhost:${httpPort}`);
-      console.log(`Health          : http://localhost:${httpPort}/health`);
+    httpServer.listen(httpPort, "0.0.0.0", () => {
+      console.log(`API (HTTP only) : http://0.0.0.0:${httpPort}`);
+      console.log(`Health          : http://0.0.0.0:${httpPort}/health`);
     });
   }
 }
