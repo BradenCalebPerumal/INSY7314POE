@@ -1,0 +1,17 @@
+# Dockerfile.sonar
+
+# Use the same base image as your build_test job for consistency
+FROM cimg/node:20.11
+
+# The 'cimg' user (uid 1000) is the default non-root user
+USER root
+
+# Install Sonar Scanner CLI globally and correctly set permissions
+# Running as root ensures the global install succeeds without EACCES errors
+RUN npm install -g sonar-scanner
+
+# Restore user to the non-root 'circleci' user
+USER circleci
+
+# Verify installation
+RUN sonar-scanner --version

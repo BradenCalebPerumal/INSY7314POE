@@ -7,10 +7,13 @@ executors:
       - image: mongo:7.0
     working_directory: ~/project
 
-  # Executor uses a Node image to ensure JS runtime is available
+  # 🏆 FINAL FIX: Use the custom, pre-built image with sonar-scanner installed.
+  # This image contains Node.js and the global sonar-scanner CLI.
   sonar_exec:
     docker:
-      - image: cimg/node:20.11
+      # *** UPDATE THIS LINE ***
+      # Replace 'your-dockerhub-user/image-name:tag' with your actual image name (e.g., bradencalebperumal/sonar-node-scanner:latest)
+      - image: your-dockerhub-user/image-name:tag 
     working_directory: ~/project
 
 jobs:
@@ -21,7 +24,7 @@ jobs:
       NODE_OPTIONS: --experimental-vm-modules
       CI: "true"
 
-      # --- Backend env (dummy but valid) ---
+      # --- Environment Variables ---
       CORS_ORIGIN: https://localhost:5173
       PWD_PEPPER: pepper_dev_secret_123456
       JWT_SECRET: jwt_dev_secret_abcdefghijklmnopqrstuvwxyz_1234567890
@@ -111,26 +114,20 @@ jobs:
     executor: sonar_exec
     environment:
       SONAR_HOST_URL: https://sonarcloud.io
-      # Ensure path to npm global bin is available for non-sudo install
-      PATH: "$PATH:$(npm bin -g)"
+      # PATH environment variable is no longer needed since the scanner is globally available in the custom image
       # SONAR_TOKEN must be set in CircleCI project env vars
     steps:
       - checkout
       - attach_workspace:
           at: .
 
-      # FIX: Install Sonar Scanner CLI globally but allow the user to write to a safe location.
-      - run:
-          name: Install Sonar Scanner CLI
-          # Use --prefix to install globally in a user-writable location (~/.npm-global)
-          command: |
-            npm config set prefix '~/.npm-global'
-            npm install -g sonar-scanner
+      # ❌ The 'Install Sonar Scanner CLI' step is REMOVED!
 
       - run:
           name: SonarCloud scan
-          # The PATH environment variable set in 'environment' should now allow 'sonar-scanner' to run
           command: |
+            # Project Key is now correct (BradenCalebPerumal_INSY7314POE)
+            # Paths are correct (relative to INSY7314-PAYMENT_PORTAL)
             sonar-scanner -X \
               -Dsonar.host.url="${SONAR_HOST_URL}" \
               -Dsonar.login="${SONAR_TOKEN}" \
