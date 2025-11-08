@@ -13,28 +13,17 @@ jobs:
       NODE_ENV: test
       CI: "true"
 
-      # ===== required by your env schema (CI-safe values) =====
-      # arrays are passed as JSON strings if your schema parses JSON
-      CORS_ORIGIN: '["http://localhost:5173","http://127.0.0.1:5173","http://example.com"]'
-
-      # length-constrained secrets
-      PWD_PEPPER: "ci_pwd_pepper_1234567890abcd"        # 28+ chars
-      JWT_SECRET: "ci_jwt_secret_1234567890_abcdefghijklmno1234567890"  # 48+ chars
+      # === FIXED ENV VARS (pass all backend env checks) ===
+      CORS_ORIGIN: '["https://example.com"]'       # valid HTTPS origin
+      PWD_PEPPER: "ci_pwd_pepper_1234567890abcd"   # ≥16 chars
+      JWT_SECRET: "ci_jwt_secret_1234567890_abcdefghijklmno1234567890"  # ≥32 chars
       DATA_KEY: "ci_data_key_1234567890abcd"
 
-      # mail (dummy)
       SMTP_HOST: "ci"
       SMTP_USER: "ci"
       SMTP_PASS: "ci"
       EMAIL_FROM: "ci@example.com"
       SEND_EMAILS: "false"
-
-      # add any other strict keys your schema requires here
-      # GOOGLE_CLIENT_ID: "ci"
-      # GOOGLE_CLIENT_SECRET: "ci"
-      # CLOUDINARY_URL: "cloudinary://ci:ci@ci"
-      # PAYFAST_MERCHANT_ID: "ci"
-      # PAYFAST_MERCHANT_KEY: "ci"
 
     steps:
       - checkout
@@ -48,6 +37,8 @@ jobs:
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             npm test -- --coverage --coverageReporters=lcov
+
+      # Optional frontend build/tests (skipped if not present)
       - run:
           name: Install deps (frontend) if present
           command: |
