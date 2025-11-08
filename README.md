@@ -68,8 +68,8 @@
 👥 **8. Authors & Contributors** <br>
 ⚖️ **9. MIT License** <br>
 ❓ **10. Frequently Asked Questions (FAQ)** <br>
-📸 **11. Pipeline Screenshots** <br>
-📚 **12. References** <br>
+🔍 **12. CircleCI Build and SonarCloud Scan Pipeline** <br>
+📚 **11. References** <br>
 
 ---
 
@@ -478,20 +478,44 @@ The SonarQube scan, run via the CircleCI pipeline, performs Static Application S
 The system enforces security via multiple layers, with a primary defense being strict whitelisting using RegEx patterns on all input fields in both the customer and employee portals. This white-list approach is the strongest defense against injection attacks like SQLi and XSS.
 
 ---
-Below are the screenshots demonstrating our automated CI/CD and code-analysis security workflow.
 
-#### ✅ CircleCI Build and SonarCloud Scan Pipeline
+### 🔍 12. CircleCI Build and SonarCloud Scan Pipeline
 
 ![CircleCI Pipeline Screenshot](./docs/screenshots/circleci_pipeline.png)
 
-The above image shows the pipeline stages on every push to `main` — including install, test (with coverage), and SonarCloud scan stages — all succeeding before deployment.
+The above image shows the automated pipeline triggered on every push to `main`.  
+The workflow includes installation, testing with coverage, security auditing, and SonarCloud scanning — all executed before deployment to ensure continuous integration and quality assurance.
 
-#### 🔍 SonarCloud Analysis Report
+---
+
+###  SonarCloud Analysis Report
 
 ![SonarCloud Report Screenshot](./docs/screenshots/sonarcloud_report.png)
 
-This screenshot highlights the **SonarCloud Dashboard** summarizing code coverage, maintainability rating, security hotspots, and vulnerability counts.  
-The scan confirms zero critical issues and no leaked secrets, verifying the system’s secure state before deployment.
+This screenshot highlights the **SonarCloud Dashboard**, showing key metrics such as:
+- Maintainability and reliability ratings (A-grade)
+- Security hotspots (reviewed and safe)
+- Code coverage and duplication metrics
+- Overall Quality Gate status before deployment
+
+---
+
+### 🔗 Live CI & Code Quality Dashboards
+
+**View the full project repository:**  
+➡️ [GitHub Repository – BradenCalebPerumal/INSY7314POE](https://github.com/BradenCalebPerumal/INSY7314POE)
+
+**View automated CircleCI pipelines (build → test → Sonar scan):**  
+➡️ [CircleCI Dashboard](https://app.circleci.com/pipelines/github/BradenCalebPerumal/INSY7314POE)
+
+**View SonarCloud analysis (Quality Gate, issues, coverage, hotspots):**  
+➡️ [SonarCloud Project Summary](https://sonarcloud.io/summary/new_code?id=BradenCalebPerumal_INSY7314POE)
+
+---
+
+### 📊 Status Badge
+
+[![CircleCI](https://circleci.com/gh/BradenCalebPerumal/INSY7314POE.svg?style=shield)](https://app.circleci.com/pipelines/github/BradenCalebPerumal/INSY7314POE)
 
 ---
 
