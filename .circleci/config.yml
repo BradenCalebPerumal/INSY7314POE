@@ -3,13 +3,16 @@ version: 2.1
 executors:
   node_with_mongo:
     docker:
-      - image: cimg/node:20.11            # primary container
-      - image: mongo:7.0                  # service container for tests
+      # Primary container where steps run
+      - image: cimg/node:20.11
+      # MongoDB service container for tests
+      - image: mongo:7.0
     working_directory: ~/project
 
   sonar_exec:
     docker:
-      - image: sonarsource/sonar-scanner-cli:5.0.1   # prebuilt scanner + Java
+      # Prebuilt SonarScanner + Java (no downloads)
+      - image: sonarsource/sonar-scanner-cli:5.0.1
     working_directory: ~/project
 
 jobs:
@@ -19,25 +22,31 @@ jobs:
       NODE_ENV: test
       NODE_OPTIONS: --experimental-vm-modules
       CI: "true"
-
-      # ---- backend env (dummy but valid) ----
+      # ---- backend env (valid dummy values) ----
       CORS_ORIGIN: https://localhost:5173
       PWD_PEPPER: pepper_dev_secret_123456
       JWT_SECRET: jwt_dev_secret_abcdefghijklmnopqrstuvwxyz_1234567890
       DATA_KEY: a62b387f8738226611b593ce0d3aa9f134a60307c8b9bf6e5c4b4d3d7e0044b8
-      MONGO_URI: mongodb://127.0.0.1:27017/testdb   # connects to the mongo service
+      MONGO_URI: mongodb://127.0.0.1:27017/testdb
       SEND_EMAILS: "false"
     steps:
       - checkout
 
       - run:
+          name: Install netcat for port checks
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y netcat-openbsd
+
+      - run:
           name: Wait for Mongo to be ready
           command: |
-            for i in {1..60}; do
-              if echo 'db.runCommand({ ping: 1 })' | mongo --quiet 127.0.0.1/testdb > /dev/null 2>&1; then
-                echo "Mongo is up"; break
+            for i in $(seq 1 60); do
+              if nc -z 127.0.0.1 27017; then
+                echo "Mongo is up ✔"; break
               fi
-              echo "Waiting for Mongo..."; sleep 2
+              echo "Waiting for Mongo... ($i/60)"
+              sleep 2
             done
 
       - run:
@@ -75,7 +84,6 @@ jobs:
       - run:
           name: SonarCloud scan
           command: |
-            # CLI properties override sonar-project.properties if present.
             sonar-scanner \
               -Dsonar.host.url="${SONAR_HOST_URL}" \
               -Dsonar.login="${SONAR_TOKEN}" \
