@@ -9,6 +9,19 @@ executors:
 jobs:
   build_test:
     executor: node_executor
+    environment:
+      NODE_ENV: test
+      CI: "true"
+      # === satisfy env schema in CI ===
+      PWD_PEPPER: "ci-pepper"
+      JWT_SECRET: "ci-jwt-secret"
+      DATA_KEY: "ci-data-key"
+      SMTP_HOST: "ci"
+      SMTP_USER: "ci"
+      SMTP_PASS: "ci"
+      EMAIL_FROM: "ci@example.com"
+      SEND_EMAILS: "false"
+      # add any other required keys your schema enforces here
     steps:
       - checkout
       - run:
@@ -58,7 +71,6 @@ jobs:
       - run:
           name: Run SonarCloud analysis
           command: |
-            # uses sonar-project.properties in repo
             sonar-scanner \
               -Dsonar.host.url=https://sonarcloud.io \
               -Dsonar.login=$SONAR_TOKEN
