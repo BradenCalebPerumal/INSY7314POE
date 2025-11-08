@@ -3,59 +3,14 @@ version: 2.1
 executors:
   node_executor:
     docker:
-      # Primary container with Node
       - image: cimg/node:20.11
-        environment:
-          # Keep Node in test mode during CI
-          NODE_ENV: test
-          CI: "true"
-          # ---- Minimal safe defaults so your env schema doesn't fail in CI ----
-          SMTP_HOST: "ci"
-          SMTP_USER: "ci"
-          SMTP_PASS: "ci"
-          EMAIL_FROM: "ci@example.com"
-          SEND_EMAILS: "false"
-          JWT_SECRET: "ci-secret"
-          # If your code tries to connect to Mongo in tests, we provide a local URL:
-          MONGO_URL: "mongodb://localhost:27017/ci_db"
-          # Add any other required keys here if your schema enforces them strictly:
-          # GOOGLE_CLIENT_ID: "ci"
-          # GOOGLE_CLIENT_SECRET: "ci"
-          # GOOGLE_REDIRECT_URL: "https://localhost/redirect"
-          # PAYFAST_MERCHANT_ID: "ci"
-          # PAYFAST_MERCHANT_KEY: "ci"
-          # CLOUDINARY_URL: "cloudinary://ci:ci@ci"
-      # Secondary service container for MongoDB (only used if your tests hit DB)
-      - image: mongo:6.0
-        command: ["--replSet", "rs0", "--bind_ip_all"]
-
     working_directory: ~/project
-
-commands:
-  wait-for-mongo:
-    steps:
-      - run:
-          name: Wait for MongoDB to accept connections
-          command: |
-            for i in $(seq 1 60); do
-              nc -z localhost 27017 && echo "Mongo is up" && break
-              echo "Waiting for Mongo ($i/60)..." && sleep 1
-            done
-      - run:
-          name: Init single-node replica set (if needed)
-          command: |
-            mongo --host localhost:27017 <<'JS' || true
-            rs.initiate({ _id: "rs0", members: [ { _id: 0, host: "localhost:27017" } ] })
-            JS
 
 jobs:
   build_test:
     executor: node_executor
     steps:
       - checkout
-      - wait-for-mongo
-
-      # ---- BACKEND ----
       - run:
           name: Install deps (backend)
           command: |
@@ -66,8 +21,6 @@ jobs:
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             npm test -- --coverage --coverageReporters=lcov
-
-      # ---- FRONTEND (optional; will skip if folder missing) ----
       - run:
           name: Install deps (frontend) if present
           command: |
@@ -105,7 +58,7 @@ jobs:
       - run:
           name: Run SonarCloud analysis
           command: |
-            # Uses your sonar-project.properties at repo root
+            # uses sonar-project.properties in repo
             sonar-scanner \
               -Dsonar.host.url=https://sonarcloud.io \
               -Dsonar.login=$SONAR_TOKEN
