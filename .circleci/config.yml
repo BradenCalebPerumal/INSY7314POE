@@ -8,7 +8,7 @@ executors:
 
   sonar_executor:
     docker:
-      # use a valid tag; 6.2.1 does not exist
+      # Use a valid tag; 6.2.1 does not exist
       - image: sonarsource/sonar-scanner-cli:5.0.1
     working_directory: ~/project
 
@@ -86,9 +86,10 @@ jobs:
     steps:
       - checkout
       - run:
-          name: SonarCloud scan (SINGLE-LINE DEBUG) 🐛
+          name: SonarCloud scan
           command: |
-            sonar-scanner -X -Dsonar.host.url="${SONAR_HOST_URL}" -Dsonar.login="${SONAR_TOKEN}" -Dsonar.organization="bradencalebperumal" -Dsonar.projectKey="bradencalebperumal_INSY7314POE" -Dsonar.projectName="INSY7314POE" -Dsonar.sourceEncoding="UTF-8" -Dsonar.projectBaseDir="INSY7314-PAYMENT_PORTAL" -Dsonar.sources="backend/src" -Dsonar.tests="backend/tests" -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info" -Dsonar.branch.name="${CIRCLE_BRANCH}"
+            # Single-line command to eliminate whitespace/backslash errors. Using 'main' for guaranteed baseline creation.
+            sonar-scanner -Dsonar.host.url="${SONAR_HOST_URL}" -Dsonar.login="${SONAR_TOKEN}" -Dsonar.organization="bradencalebperumal" -Dsonar.projectKey="bradencalebperumal_INSY7314POE" -Dsonar.projectName="INSY7314POE" -Dsonar.sourceEncoding="UTF-8" -Dsonar.projectBaseDir="INSY7314-PAYMENT_PORTAL" -Dsonar.sources="backend/src" -Dsonar.tests="backend/tests" -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info" -Dsonar.branch.name="main"
 
 workflows:
   build_pipeline:
