@@ -7,10 +7,10 @@ executors:
       - image: mongo:7.0
     working_directory: ~/project
 
+  # UPDATED EXECUTOR: Use Node image and install scanner in job steps
   sonar_exec:
     docker:
-      # This image lacks Node.js, which is why we must install it in the job steps
-      - image: sonarsource/sonar-scanner-cli:5.0.1
+      - image: cimg/node:20.11
     working_directory: ~/project
 
 jobs:
@@ -74,8 +74,8 @@ jobs:
           command: |
             cd INSY7314-PAYMENT_PORTAL/backend
             npm test --runInBand --coverage --coverageReporters=lcov
-            
-      # --- Frontend Build & Test (New/Integrated) ---
+
+      # --- Frontend Build & Test (Integrated) ---
       - run:
           name: Install deps (frontend)
           command: |
@@ -86,7 +86,6 @@ jobs:
           name: Jest coverage (frontend)
           command: |
             cd INSY7314-PAYMENT_PORTAL/frontend
-            # Assuming Jest/coverage is configured for the frontend
             npm test --runInBand --coverage --coverageReporters=lcov
 
       # --- Coverage Setup (Updated for both) ---
@@ -117,17 +116,11 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
-          
-      # 🚀 FIX: Install Node.js for JS/TS analysis
+
+      # 🚀 FIX: Install Sonar Scanner CLI since Node image is used
       - run:
-          name: Install Node.js for Sonar Scanner
-          command: |
-            # Use NodeSource for latest LTS version
-            sudo apt-get update -y
-            sudo apt-get install -y curl
-            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-            sudo apt-get install -y nodejs
-            node -v # Verify installation (should show v20.x)
+          name: Install Sonar Scanner CLI
+          command: sudo npm install -g sonar-scanner
 
       - run:
           name: SonarCloud scan
@@ -143,7 +136,6 @@ jobs:
               -Dsonar.sources="backend/src,frontend/src" \
               -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" \
               -Dsonar.test.inclusions="**/*.{test,spec}.{js,jsx,ts,tsx}" \
-              # FIXED: Combined LCOV reports for both apps, path is relative
               -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info,frontend/coverage/lcov.info"
 
 workflows:
