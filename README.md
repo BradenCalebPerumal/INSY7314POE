@@ -68,8 +68,9 @@
 👥 **8. Authors & Contributors** <br>
 ⚖️ **9. MIT License** <br>
 ❓ **10. Frequently Asked Questions (FAQ)** <br>
-🔍 **12. CircleCI Build and SonarCloud Scan Pipeline** <br>
-📚 **11. References** <br>
+🔍 **11. CircleCI Build and SonarCloud Scan Pipeline** <br>
+▶️ **12. Video Demo** <br>
+📚 **13. References** <br>
 
 ---
 
@@ -516,6 +517,20 @@ This screenshot highlights the **SonarCloud Dashboard**, showing key metrics suc
 ### 📊 Status Badge
 
 [![CircleCI](https://circleci.com/gh/BradenCalebPerumal/INSY7314POE.svg?style=shield)](https://app.circleci.com/pipelines/github/BradenCalebPerumal/INSY7314POE)
+
+---
+
+#### ▶️ Video Demo Link  
+[**🎬 Watch the Demo on YouTube**](https://drive.google.com/file/d/1f7UPhCamZaUpfZRMsea73MzruBAe9tnA/view?usp=sharing\)  
+
+#### 💡 Demo Overview
+The demonstration covers:
+- 🔐 **Authentication Flow** – Secure login, account verification, and rate limiting  
+- 💻 **Frontend Interface** – Modern React-based UI with validation and accessibility  
+- ⚙️ **Backend API** – Express.js API endpoints integrated with MongoDB  
+- 🧩 **DevSecOps Pipeline** – Automated build, test, and scan via CircleCI + SonarCloud  
+- 🚀 **Deployment** – Dockerized environment configured for cloud readiness  
+
 
 ---
 
