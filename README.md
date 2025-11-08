@@ -68,7 +68,8 @@
 👥 **8. Authors & Contributors** <br>
 ⚖️ **9. MIT License** <br>
 ❓ **10. Frequently Asked Questions (FAQ)** <br>
-📚 **11. References** <br>
+📸 **11. Pipeline Screenshots** <br>
+📚 **12. References** <br>
 
 ---
 
@@ -477,9 +478,6 @@ The SonarQube scan, run via the CircleCI pipeline, performs Static Application S
 The system enforces security via multiple layers, with a primary defense being strict whitelisting using RegEx patterns on all input fields in both the customer and employee portals. This white-list approach is the strongest defense against injection attacks like SQLi and XSS.
 
 ---
-
-### 📸 Pipeline Screenshots
-
 Below are the screenshots demonstrating our automated CI/CD and code-analysis security workflow.
 
 #### ✅ CircleCI Build and SonarCloud Scan Pipeline
@@ -497,8 +495,7 @@ The scan confirms zero critical issues and no leaked secrets, verifying the syst
 
 ---
 
-
-## 📚 11. References
+## 📚 12. References
 
 - **Argon2, n.d. Argon2 Library.** [online] _[npm (npmjs.com)](https://www.npmjs.com/package/argon2)_ [Accessed 08 October 2025].
 - **Express.js, n.d. Documentation.** [online] _[Expressjs.com](https://expressjs.com/)_ [Accessed 08 October 2025].
