@@ -1,8 +1,5 @@
 version: 2.1
 
-orbs:
-  sonarcloud: sonarsource/sonarcloud@2.0.0
-
 executors:
   node_executor:
     docker:
@@ -17,7 +14,7 @@ jobs:
       NODE_OPTIONS: --experimental-vm-modules
       CI: "true"
 
-      # --- backend env (dummy but valid) ---
+      # --- backend environment variables (valid dummy values) ---
       CORS_ORIGIN: https://localhost:5173
       PWD_PEPPER: dummy_pepper_for_ci
       JWT_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef
@@ -34,7 +31,6 @@ jobs:
     steps:
       - checkout
 
-      # ---- BACKEND ----
       - run:
           name: Install deps (backend)
           command: |
@@ -53,7 +49,6 @@ jobs:
             cd INSY7314-PAYMENT_PORTAL/backend
             npm test --runInBand --coverage --coverageReporters=lcov
 
-      # ---- FRONTEND (optional) ----
       - run:
           name: Install deps (frontend) if present
           command: |
@@ -61,6 +56,7 @@ jobs:
               cd INSY7314-PAYMENT_PORTAL/frontend
               if [ -f package-lock.json ]; then npm ci; else npm install; fi
             fi
+
       - run:
           name: Lint frontend (non-blocking) if present
           command: |
@@ -68,6 +64,7 @@ jobs:
               cd INSY7314-PAYMENT_PORTAL/frontend
               npm run lint || true
             fi
+
       - run:
           name: Build frontend (if present)
           command: |
@@ -76,15 +73,42 @@ jobs:
               npm run build --if-present || npx vite build
             fi
 
+  sonar_scan:
+    executor: node_executor
+    steps:
+      - checkout
+      - run:
+          name: Install Java + unzip
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y openjdk-17-jre-headless unzip
+            java -version
+      - run:
+          name: Download sonar-scanner (CLI)
+          command: |
+            set -e
+            SC_VERSION=6.2.1.4610
+            SC_ZIP="sonar-scanner-${SC_VERSION}-linux-x64.zip"
+            SC_URL="https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/${SC_ZIP}"
+            echo "Downloading ${SC_URL}"
+            curl -fsSL -o "${SC_ZIP}" -L "${SC_URL}"
+            unzip -q "${SC_ZIP}"
+            SC_DIR="sonar-scanner-${SC_VERSION}-linux-x64"
+            echo 'export PATH="$PWD/'"${SC_DIR}"'/bin:$PATH"' >> $BASH_ENV
+            echo 'export SONAR_SCANNER_OPTS="-Xmx1024m"' >> $BASH_ENV
+            source $BASH_ENV
+            sonar-scanner -v
+      - run:
+          name: Run SonarCloud analysis
+          command: |
+            sonar-scanner \
+              -Dsonar.host.url=https://sonarcloud.io \
+              -Dsonar.login=$SONAR_TOKEN
+
 workflows:
   build_pipeline:
     jobs:
       - build_test
-      - sonarcloud/scan:
+      - sonar_scan:
           requires:
             - build_test
-          # Use the context that contains SONAR_TOKEN (recommended)
-          context: sonarcloud
-          # If you don't use a context, you can pass env directly:
-          # environment:
-          #   SONAR_TOKEN: << pipeline.parameters.SONAR_TOKEN >>
