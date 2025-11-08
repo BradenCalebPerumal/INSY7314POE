@@ -121,24 +121,30 @@ jobs:
       # 1. CRITICAL FIX: Set up a remote Docker environment
       - setup_remote_docker:
           docker_layer_caching: false
-          
+
       - run:
           name: SonarCloud scan using official image (Path Fix)
           command: |
+            # sanity check on the host
+            ls -al
+            ls -al INSY7314-PAYMENT_PORTAL || true
+            ls -al INSY7314-PAYMENT_PORTAL/backend/src || true
+            ls -al INSY7314-PAYMENT_PORTAL/frontend/src || true
+
             docker run --rm \
               -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
               -e SONAR_TOKEN="${SONAR_TOKEN}" \
-              -v "$(pwd):/usr/src" \
+              -v "$(pwd)/INSY7314-PAYMENT_PORTAL:/usr/src/INSY7314-PAYMENT_PORTAL" \
               sonarsource/sonar-scanner-cli \
               -Dsonar.organization="bradencalebperumal" \
               -Dsonar.projectKey="BradenCalebPerumal_INSY7314POE" \
               -Dsonar.projectName="INSY7314POE" \
               -Dsonar.sourceEncoding="UTF-8" \
-              -Dsonar.projectBaseDir="/usr/src" \
-              -Dsonar.sources="INSY7314-PAYMENT_PORTAL/backend/src,INSY7314-PAYMENT_PORTAL/frontend/src" \
+              -Dsonar.projectBaseDir="/usr/src/INSY7314-PAYMENT_PORTAL" \
+              -Dsonar.sources="backend/src,frontend/src" \
               -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" \
               -Dsonar.test.inclusions="**/*.{test,spec}.{js,jsx,ts,tsx}" \
-              -Dsonar.javascript.lcov.reportPaths="INSY7314-PAYMENT_PORTAL/backend/coverage/lcov.info,INSY7314-PAYMENT_PORTAL/frontend/coverage/lcov.info"
+              -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info,frontend/coverage/lcov.info"
 
 
 workflows:
