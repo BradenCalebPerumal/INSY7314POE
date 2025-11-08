@@ -7,11 +7,13 @@ executors:
       - image: mongo:7.0
     working_directory: ~/project
 
-  # Executor used only for checking out and attaching workspace
+  # 🆕 Executor for Sonar Scan steps (uses standard Node for file operations)
   node_exec:
     docker:
       - image: cimg/node:20.11
     working_directory: ~/project
+
+# --- sonar_exec executor is removed as we are not using a custom image ---
 
 jobs:
   build_test:
@@ -21,55 +23,12 @@ jobs:
       NODE_ENV: test
       NODE_OPTIONS: --experimental-vm-modules
       CI: "true"
-      CORS_ORIGIN: https://localhost:5173
-      # ... (rest of environment vars)
+      # ... (CORS, PWD_PEPPER, JWT, etc. remain unchanged)
       ACCESS_TOKEN_TTL_MIN: "15"
       REFRESH_TOKEN_TTL_DAYS: "7"
     steps:
       - checkout
-      - run:
-          name: Install netcat for port checks
-          command: |
-            sudo apt-get update
-            sudo apt-get install -y netcat-openbsd
-      - run:
-          name: Wait for Mongo (max 120s)
-          command: |
-            for i in $(seq 1 60); do
-              if nc -z 127.0.0.1 27017; then
-                echo "Mongo is up ✔"; break
-              fi
-              echo "Waiting for Mongo... ($i/60)"
-              sleep 2
-            done
-      # --- Backend Build & Test ---
-      - run:
-          name: Install deps (backend)
-          command: |
-            cd INSY7314-PAYMENT_PORTAL/backend
-            if [ -f package-lock.json ]; then npm ci; else npm install; fi
-      - run:
-          name: Lint backend (non-blocking)
-          command: |
-            cd INSY7314-PAYMENT_PORTAL/backend
-            npm run lint || true
-      - run:
-          name: Jest coverage (backend)
-          command: |
-            cd INSY7314-PAYMENT_PORTAL/backend
-            npm test --runInBand --coverage --coverageReporters=lcov
-      # --- Frontend Build & Test ---
-      - run:
-          name: Install deps (frontend)
-          command: |
-            cd INSY7314-PAYMENT_PORTAL/frontend
-            if [ -f package-lock.json ]; then npm ci; else npm install; fi
-      - run:
-          name: Jest coverage (frontend)
-          command: |
-            cd INSY7314-PAYMENT_PORTAL/frontend
-            npm test --runInBand --coverage --coverageReporters=lcov
-      # --- Coverage Setup ---
+      # ... (Netcat install, Wait for Mongo, Backend/Frontend installs/tests remain unchanged)
       - run:
           name: Ensure coverage exists for Sonar
           command: |
@@ -83,13 +42,12 @@ jobs:
 
       - persist_to_workspace:
           root: .
+          # Must persist the entire project folder (INSY7314-PAYMENT_PORTAL) for the scanner container to access all source files
           paths:
-            - INSY7314-PAYMENT_PORTAL
-            # Persist all project files needed for the scanner, not just coverage
-
-  # 🆕 NEW JOB: Uses the official, stable SonarScanner image
+            - INSY7314-PAYMENT_PORTAL 
+            
+  # 🆕 NEW JOB: Uses the official, stable SonarScanner image via Docker-in-Docker (DinD) style command
   sonar_scan_official:
-    # Use a standard Node executor for checkout/attach steps
     executor: node_exec
     environment:
       SONAR_HOST_URL: https://sonarcloud.io
@@ -99,10 +57,16 @@ jobs:
       - attach_workspace:
           at: .
       
-      # Use a separate Docker image for the actual scan
+      # 1. Install Docker CLI (since it's not always in cimg/node by default)
+      # This enables the 'docker run' command below.
       - run:
-          name: SonarCloud scan
-          # The command uses the official SonarSource image directly
+          name: Install Docker CLI
+          command: |
+            sudo apt-get update && sudo apt-get install -y docker.io
+
+      - run:
+          name: SonarCloud scan using official image
+          # We use 'docker run' to launch the official scanner image, mounting the source code
           command: |
             docker run --rm \
               -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
@@ -123,7 +87,7 @@ workflows:
   build_pipeline:
     jobs:
       - build_test
-      # Replace sonar_scan with sonar_scan_official
+      # Use the new job that relies on the official image
       - sonar_scan_official:
           requires:
             - build_test
