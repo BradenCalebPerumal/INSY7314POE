@@ -96,10 +96,10 @@ jobs:
               -Dsonar.projectName="INSY7314POE" \
               -Dsonar.sourceEncoding="UTF-8" \
               -Dsonar.projectBaseDir="INSY7314-PAYMENT_PORTAL" \
-              -Dsonar.sources="INSY7314-PAYMENT_PORTAL/backend/src,INSY7314-PAYMENT_PORTAL/frontend/src" \
-              -Dsonar.tests="INSY7314-PAYMENT_PORTAL/backend/tests,INSY7314-PAYMENT_PORTAL/frontend/tests" \
+              -Dsonar.sources="backend/src" \
+              -Dsonar.tests="backend/tests" \
               -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/build/**,**/bin/**,**/obj/**" \
-              -Dsonar.javascript.lcov.reportPaths="INSY7314-PAYMENT_PORTAL/backend/coverage/lcov.info"
+              -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info"
 
 workflows:
   build_pipeline:
