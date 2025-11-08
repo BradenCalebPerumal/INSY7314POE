@@ -7,11 +7,10 @@ executors:
       - image: mongo:7.0
     working_directory: ~/project
 
-  # 🏆 NEW EXECUTOR: Uses a CircleCI image with Docker CLI pre-installed.
-  docker_exec:
-    # This image includes the Docker CLI, making 'docker run' possible without installation.
+  # Standard executor for Sonar Scan steps
+  node_exec:
     docker:
-      - image: cimg/base:2023.10
+      - image: cimg/node:20.11 # Use a Node image to ensure node/npm tools are available if needed
     working_directory: ~/project
 
 # --- The custom 'sonar_exec' executor is removed ---
@@ -24,8 +23,7 @@ jobs:
       NODE_ENV: test
       NODE_OPTIONS: --experimental-vm-modules
       CI: "true"
-      CORS_ORIGIN: https://localhost:5173
-      # ... (rest of environment vars)
+      # ... (CORS, PWD_PEPPER, JWT, etc. remain unchanged)
       ACCESS_TOKEN_TTL_MIN: "15"
       REFRESH_TOKEN_TTL_DAYS: "7"
     steps:
@@ -33,14 +31,13 @@ jobs:
       # ... (All installation, wait, and test steps remain unchanged)
       - persist_to_workspace:
           root: .
-          # Must persist the entire project folder (INSY7314-PAYMENT_PORTAL) for the scanner container to access source files
+          # Persist the entire project folder for the scanner container to access source files
           paths:
             - INSY7314-PAYMENT_PORTAL 
             
-  # 🏆 NEW JOB: Uses the official, stable SonarScanner image via Docker-in-Docker (DinD) style command
+  # 🏆 FINAL, STABLE JOB: Runs the scan using the official SonarSource image with remote Docker
   sonar_scan_official:
-    # Use the new executor with Docker CLI installed
-    executor: docker_exec
+    executor: node_exec
     environment:
       SONAR_HOST_URL: https://sonarcloud.io
       # SONAR_TOKEN must be set in CircleCI project env vars
@@ -49,11 +46,15 @@ jobs:
       - attach_workspace:
           at: .
       
-      # The 'docker run' command executes the Sonar scan using the official image
+      # 1. CRITICAL FIX: Set up a remote Docker environment
+      - setup_remote_docker:
+          docker_layer_caching: false
+      
+      # 2. The 'docker run' command executes the Sonar scan using the official image
       - run:
           name: SonarCloud scan using official image
           command: |
-            # The 'docker' command is available here. It pulls the SonarSource image and runs it.
+            # The docker command is now run inside the remote environment
             docker run --rm \
               -e SONAR_HOST_URL="${SONAR_HOST_URL}" \
               -e SONAR_TOKEN="${SONAR_TOKEN}" \
