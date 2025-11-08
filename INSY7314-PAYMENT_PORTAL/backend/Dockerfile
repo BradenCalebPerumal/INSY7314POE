@@ -1,4 +1,5 @@
 FROM node:20-alpine
+
 RUN addgroup -S app && adduser -S app -G app
 WORKDIR /usr/src/app
 
