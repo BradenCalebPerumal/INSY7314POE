@@ -3,11 +3,11 @@ node_modules
 dist
 build
 coverage
-.vscode
-.idea
-.git
-.gitignore
 .env
 .env.*
 ssl
+.git
+.gitignore
+.vscode
+.idea
 *.log
